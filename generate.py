@@ -225,13 +225,11 @@ def page_letter(letter_text, co):
                         if not p.strip().lower().startswith('dear doctor'))
     return f'''<div class="pg ltr">
 <div class="lbody">
-  <div class="ldt">2026</div>
   <div class="lsal">Dear Doctor,</div>
   <div class="ltxt">{body_html}</div>
   <div class="lsign">
     <div class="lcl">{e(closing)}</div>
     <div class="lnm">{e(signoff)}</div>
-    <div class="lcontact">nestu.health &nbsp;·&nbsp; {e(co.get("portal","nestu.online"))}</div>
   </div>
 </div>
 </div>'''
@@ -288,16 +286,18 @@ def page_products(brand, products, page_num, total_pages, logo_b64=None):
         cards += (f'<div class="pc"><div class="pcimg">{img_html}</div>'
                   f'<div class="pcinf">'
                   f'<div class="pcnm">{name}</div>'
-                  f'{f"""<div class="pccat">{cat}</div>""" if cat else ""}'
+                  ''
                   f'{f"""<div class="pcref">{ref}</div>""" if ref else ""}'
                   f'</div></div>')
     pag = f'{e(brand)} · {page_num}/{total_pages}' if total_pages>1 else e(brand)
+    rows = math.ceil(max(len(products),1) / 3)
+    grid_rows = f'grid-template-rows:repeat({rows},1fr)'
     return f'''<div class="pg">
 <div class="pphd">
   <div class="pphd-l">{logo_html}<span class="ppbrand">{e(brand)}</span></div>
   <span class="pplogo">NESTU<sup>®</sup></span>
 </div>
-<div class="ppgrid">{cards}</div>
+<div class="ppgrid" style="{grid_rows}">{cards}</div>
 <div class="pppage">{pag}</div>
 </div>'''
 
@@ -370,14 +370,13 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'NA',sans-serif;bac
 /* LETTER */
 .ltr{justify-content:center;}
 .lbody{padding:64px 64px 48px;max-width:680px;margin:0 auto;width:100%;}
-.ldt{font-size:12px;color:var(--g600);margin-bottom:28px;}
 .lsal{font-size:20px;font-weight:900;color:var(--blue);margin-bottom:20px;}
 .ltxt{font-size:13.5px;line-height:1.9;color:var(--tx);text-align:justify;}
 .ltxt p{margin-bottom:14px;}
 .lsign{margin-top:36px;}
 .lcl{font-size:13px;color:var(--tx);margin-bottom:28px;font-style:italic;}
 .lnm{font-size:15px;font-weight:900;color:var(--blue);}
-.lcontact{font-size:11px;color:var(--g600);margin-top:4px;}
+
 /* TOC */
 .pghd{background:var(--blue);padding:28px 52px;flex-shrink:0;}
 .pghd-l{font-size:10px;font-weight:700;color:rgba(255,255,255,.5);letter-spacing:.22em;text-transform:uppercase;margin-bottom:6px;}
@@ -410,17 +409,16 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'NA',sans-serif;bac
 .ppbrand{font-size:14px;font-weight:900;color:#fff;letter-spacing:.07em;text-transform:uppercase;}
 .pplogo{font-size:14px;font-weight:900;color:rgba(255,255,255,.5);}
 .pplogo sup{font-size:7px;vertical-align:super;}
-.ppgrid{flex:1;padding:14px 26px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:11px;}
-.pc{border:0.5px solid var(--g200);border-radius:7px;overflow:hidden;display:flex;flex-direction:column;transition:border-color .15s;}
+.ppgrid{flex:1;min-height:0;padding:12px 24px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.pc{border:0.5px solid var(--g200);border-radius:7px;overflow:hidden;display:flex;flex-direction:column;min-height:0;transition:border-color .15s;}
 .pc:hover{border-color:var(--blue);}
-.pcimg{background:#fff;display:flex;align-items:center;justify-content:center;border-bottom:0.5px solid var(--g100);flex-shrink:0;flex:0 0 55%;overflow:hidden;}
-.pcimg img{width:100%;height:100%;object-fit:contain;padding:8px;}
-.pcph{font-family:'NA';font-size:38px;font-weight:900;color:var(--g200);}
-.pcinf{padding:8px 9px;flex:1;display:flex;flex-direction:column;overflow:hidden;}
-.pcnm{font-size:10.5px;font-weight:700;color:var(--tx);line-height:1.3;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
-.pccat{font-size:9px;color:var(--blue);font-weight:700;letter-spacing:.02em;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.pcref{font-size:8.5px;color:var(--g400);letter-spacing:.02em;margin-top:1px;}
-.pppage{padding:6px 32px;text-align:center;font-size:9px;color:var(--g400);flex-shrink:0;}
+.pcimg{flex:1;min-height:0;background:#fff;display:flex;align-items:center;justify-content:center;border-bottom:0.5px solid var(--g100);overflow:hidden;}
+.pcimg img{max-width:100%;max-height:100%;object-fit:contain;padding:8px;}
+.pcph{font-family:'NA';font-size:42px;font-weight:900;color:var(--g200);}
+.pcinf{flex-shrink:0;padding:8px 10px 9px;display:flex;flex-direction:column;gap:3px;}
+.pcnm{font-size:13px;font-weight:700;color:var(--tx);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.pcref{font-size:10.5px;color:var(--g400);letter-spacing:.02em;}
+.pppage{padding:5px 30px;text-align:center;font-size:9px;color:var(--g400);flex-shrink:0;}
 /* CLOSING */
 .cls{background:var(--blue)!important;align-items:center;justify-content:center;}
 .cls::after{content:'N';position:absolute;bottom:-45px;right:-18px;font-family:'NA';font-weight:900;font-size:600px;line-height:1;color:rgba(255,255,255,.04);pointer-events:none;user-select:none;}
