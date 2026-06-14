@@ -192,6 +192,47 @@ def copy_static_assets():
         if src.exists():
             shutil.copy2(src, dst)
 
+def generate_index():
+    """Regenerate the landing page with correct fonts and branding."""
+    html = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NESTU® Veterinary Product Catalogues 2026</title>
+<style>
+@font-face{font-family:'NA';src:url('fonts/NeulisAlt-Black.otf') format('opentype');font-weight:900;font-display:swap;}
+@font-face{font-family:'NA';src:url('fonts/NeulisAlt-Medium.otf') format('opentype');font-weight:500;font-display:swap;}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'NA',sans-serif;background:#3040C4;}
+body{display:flex;align-items:center;justify-content:center;}
+.card{background:#fff;border-radius:14px;padding:52px 60px;text-align:center;width:min(440px,90vw);}
+.logo{font-size:58px;font-weight:900;color:#3040C4;letter-spacing:-.01em;line-height:1;}
+.logo sup{font-size:24px;vertical-align:super;}
+.sub{font-size:11px;font-weight:500;color:#9ba5cc;letter-spacing:.18em;text-transform:uppercase;margin-top:8px;margin-bottom:44px;}
+.links{display:flex;flex-direction:column;gap:12px;}
+a{display:block;padding:16px 24px;border-radius:8px;background:#3040C4;color:#fff;text-decoration:none;font-size:15px;font-weight:700;letter-spacing:.04em;transition:background .15s;}
+a:hover{background:#2434A8;}
+.tag{margin-top:32px;font-size:10px;font-weight:500;color:#c0c8e8;letter-spacing:.1em;text-transform:uppercase;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">NESTU<sup>®</sup></div>
+  <div class="sub">Veterinary Product Catalogues &nbsp;·&nbsp; 2026</div>
+  <div class="links">
+    <a href="jordan.html">Jordan Catalogue</a>
+    <a href="uae.html">UAE Catalogue</a>
+    <a href="ksa.html">KSA Catalogue</a>
+  </div>
+  <div class="tag">Empowering Vets to Take Better Care of Our Pets</div>
+</div>
+</body>
+</html>"""
+    (OUTPUT_DIR / 'index.html').write_text(html, encoding='utf-8')
+    print('  ✓ docs/index.html')
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # HTML HELPERS
 # ─────────────────────────────────────────────────────────────────────────────
@@ -706,6 +747,7 @@ def main():
     # Copy fonts to docs/fonts/ (served by GitHub Pages)
     print('Copying static assets...')
     copy_static_assets()
+    generate_index()
 
     # Load dear doctor
     dp = CONFIG_DIR / 'dear_doctor.txt'
