@@ -60,9 +60,12 @@ EXCLUDE_CATEG_IDS = []
 # Example: EXCLUDE_NAME_CONTAINS = ['kit', 'bin', 'tray', 'set']
 EXCLUDE_NAME_CONTAINS = []
 
-# Products whose internal reference (default_code) starts with these strings
-# are excluded. E.g. Purina Pro Plan bins/kits start with PPP5.
-EXCLUDE_CODE_STARTSWITH = ['PPP5']
+# Exclude products where BOTH conditions match: code starts with prefix AND name contains keyword
+# Each tuple: (code_prefix, name_contains)
+EXCLUDE_CODE_AND_NAME = [
+    ('PPP5', 'kit'),
+    ('PPP5', 'bin'),
+]
 
 # ── COMPANIES ──────────────────────────────────────────────────────────────
 COMPANIES = {
@@ -580,9 +583,11 @@ def should_exclude(p):
     name = (p.get('name') or '').lower()
     if any(k.lower() in name for k in EXCLUDE_NAME_CONTAINS):
         return True
-    ref = (p.get('default_code') or '')
-    if any(ref.startswith(prefix) for prefix in EXCLUDE_CODE_STARTSWITH):
-        return True
+    ref = (p.get('default_code') or '').upper()
+    name_lower = (p.get('name') or '').lower()
+    for prefix, keyword in EXCLUDE_CODE_AND_NAME:
+        if ref.startswith(prefix.upper()) and keyword.lower() in name_lower:
+            return True
     return False
 
 def generate_company(odoo, slug, dear_doctor):
