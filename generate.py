@@ -357,10 +357,10 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'NA',sans-serif;bac
 .cv-ey{font-size:11px;font-weight:500;color:rgba(255,255,255,.55);letter-spacing:.22em;text-transform:uppercase;margin-bottom:10px;}
 .cv-title{font-size:32px;font-weight:900;color:#fff;letter-spacing:.05em;text-transform:uppercase;line-height:1.2;}
 .cv-yr{font-size:13px;font-weight:400;color:rgba(255,255,255,.5);letter-spacing:.3em;margin-top:10px;}
-.cv-foot{position:absolute;bottom:44px;left:0;right:0;text-align:center;z-index:1;}
+.cv-foot{position:absolute;bottom:44px;left:0;right:0;z-index:1;display:flex;flex-direction:column;align-items:center;gap:4px;}
 .cv-tag{font-size:10px;font-weight:500;color:rgba(255,255,255,.4);letter-spacing:.12em;text-transform:uppercase;}
-.cv-url{font-size:12px;font-weight:700;color:rgba(255,255,255,.68);margin-top:7px;}
-.cv-portal{display:inline-block;font-size:11px;font-weight:700;color:rgba(255,255,255,.85);margin-top:8px;letter-spacing:.06em;text-decoration:none;border:1px solid rgba(255,255,255,.35);border-radius:20px;padding:5px 18px;transition:background .15s;}
+.cv-url{font-size:12px;font-weight:700;color:rgba(255,255,255,.68);}
+.cv-portal{display:inline-block;font-size:11px;font-weight:700;color:rgba(255,255,255,.85);letter-spacing:.06em;text-decoration:none;border:1px solid rgba(255,255,255,.35);border-radius:20px;padding:5px 18px;transition:background .15s;}
 .cv-tag2{font-size:13px;font-weight:500;color:rgba(255,255,255,.65);letter-spacing:.1em;text-transform:uppercase;text-align:center;line-height:1.65;}
 /* LETTER */
 .ltr{justify-content:center;}
