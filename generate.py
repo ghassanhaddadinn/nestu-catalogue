@@ -138,8 +138,6 @@ body{display:flex;align-items:center;justify-content:center;}
 .links{display:flex;flex-direction:column;gap:10px;}
 a.cat{display:block;padding:15px 22px;border-radius:8px;background:#3040C4;color:#fff;text-decoration:none;font-size:15px;font-weight:700;letter-spacing:.04em;transition:background .15s;}
 a.cat:hover{background:#2434A8;}
-a.portal{display:block;padding:11px 22px;border-radius:8px;background:#e8ecff;color:#3040C4;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:.03em;margin-top:6px;transition:background .15s;}
-a.portal:hover{background:#d0d8ff;}
 .tag{margin-top:28px;font-size:10px;font-weight:500;color:#c0c8e8;letter-spacing:.1em;text-transform:uppercase;}
 </style>
 </head>
@@ -151,7 +149,6 @@ a.portal:hover{background:#d0d8ff;}
     <a class="cat" href="jordan.html">Jordan Catalogue</a>
     <a class="cat" href="uae.html">UAE Catalogue</a>
     <a class="cat" href="ksa.html">KSA Catalogue</a>
-    <a class="portal" href="https://uae.nestu.online" target="_blank">B2B Portal &nbsp;→&nbsp; nestu.online</a>
   </div>
   <div class="tag">Empowering Vets to Take Better Care of Our Pets</div>
 </div>
@@ -290,14 +287,12 @@ def page_products(brand, products, page_num, total_pages, logo_b64=None):
                   f'{f"""<div class="pcref">{ref}</div>""" if ref else ""}'
                   f'</div></div>')
     pag = f'{e(brand)} · {page_num}/{total_pages}' if total_pages>1 else e(brand)
-    rows = math.ceil(max(len(products),1) / 3)
-    grid_rows = f'grid-template-rows:repeat({rows},1fr)'
     return f'''<div class="pg">
 <div class="pphd">
   <div class="pphd-l">{logo_html}<span class="ppbrand">{e(brand)}</span></div>
   <span class="pplogo">NESTU<sup>®</sup></span>
 </div>
-<div class="ppgrid" style="{grid_rows}">{cards}</div>
+<div class="ppgrid">{cards}</div>
 <div class="pppage">{pag}</div>
 </div>'''
 
@@ -311,7 +306,7 @@ def page_closing(co):
 </div>
 <div class="cv-foot">
   <div class="cv-url">nestu.health &nbsp;·&nbsp; info@nestu.health</div>
-  <div class="cv-portal">B2B Portal: {e(co.get("portal","nestu.online"))}</div>
+  <a class="cv-portal" href="https://nestu.online" target="_blank">B2B Portal &nbsp;→&nbsp; nestu.online</a>
   <div class="cv-tag">© 2026 NESTU Ltd. · Jordan · UAE · KSA</div>
 </div>
 </div>'''
@@ -365,7 +360,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'NA',sans-serif;bac
 .cv-foot{position:absolute;bottom:44px;left:0;right:0;text-align:center;z-index:1;}
 .cv-tag{font-size:10px;font-weight:500;color:rgba(255,255,255,.4);letter-spacing:.12em;text-transform:uppercase;}
 .cv-url{font-size:12px;font-weight:700;color:rgba(255,255,255,.68);margin-top:7px;}
-.cv-portal{font-size:11px;font-weight:500;color:rgba(255,255,255,.5);margin-top:5px;letter-spacing:.04em;}
+.cv-portal{display:inline-block;font-size:11px;font-weight:700;color:rgba(255,255,255,.85);margin-top:8px;letter-spacing:.06em;text-decoration:none;border:1px solid rgba(255,255,255,.35);border-radius:20px;padding:5px 18px;transition:background .15s;}
 .cv-tag2{font-size:13px;font-weight:500;color:rgba(255,255,255,.65);letter-spacing:.1em;text-transform:uppercase;text-align:center;line-height:1.65;}
 /* LETTER */
 .ltr{justify-content:center;}
@@ -409,14 +404,14 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'NA',sans-serif;bac
 .ppbrand{font-size:14px;font-weight:900;color:#fff;letter-spacing:.07em;text-transform:uppercase;}
 .pplogo{font-size:14px;font-weight:900;color:rgba(255,255,255,.5);}
 .pplogo sup{font-size:7px;vertical-align:super;}
-.ppgrid{flex:1;min-height:0;padding:12px 24px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.ppgrid{flex:1;min-height:0;padding:12px 24px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:10px;}
 .pc{border:0.5px solid var(--g200);border-radius:7px;overflow:hidden;display:flex;flex-direction:column;min-height:0;transition:border-color .15s;}
 .pc:hover{border-color:var(--blue);}
 .pcimg{flex:1;min-height:0;background:#fff;display:flex;align-items:center;justify-content:center;border-bottom:0.5px solid var(--g100);overflow:hidden;}
 .pcimg img{max-width:100%;max-height:100%;object-fit:contain;padding:8px;}
 .pcph{font-family:'NA';font-size:42px;font-weight:900;color:var(--g200);}
 .pcinf{flex-shrink:0;padding:8px 10px 9px;display:flex;flex-direction:column;gap:3px;}
-.pcnm{font-size:13px;font-weight:700;color:var(--tx);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.pcnm{font-size:13px;font-weight:700;color:var(--tx);line-height:1.3;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
 .pcref{font-size:10.5px;color:var(--g400);letter-spacing:.02em;}
 .pppage{padding:5px 30px;text-align:center;font-size:9px;color:var(--g400);flex-shrink:0;}
 /* CLOSING */
