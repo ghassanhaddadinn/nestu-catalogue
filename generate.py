@@ -86,7 +86,7 @@ def get_product_templates(odoo, tmpl_ids):
     if not tmpl_ids: return []
     return odoo('product.template','search_read',
         [['id','in',list(tmpl_ids)],['active','=',True]],
-        fields=['id','name','product_tag_ids','default_code','categ_id','image_1920'],limit=0)
+        fields=['id','name','product_tag_ids','default_code','categ_id','image_1920','public_categ_ids'],limit=0)
 
 def get_brand_tags(odoo, tag_ids):
     if not tag_ids: return {}
@@ -296,18 +296,26 @@ def page_products(brand, products, page_num, total_pages, logo_b64=None):
         cat  = e((p.get('categ_id') or [False,''])[1] or '')
         img  = p.get('_img')
         in_stock = p.get('_in_stock', True)
-        av_cls = 'av' if in_stock else 'oos'
+        is_med = p.get('_is_medical_device', False)
         img_html = (f'<img src="data:image/png;base64,{img}" alt="{name}">'
                     if img else f'<span class="pcph">{e(str(p.get("name","P"))[0].upper())}</span>')
-        oos_cls = '' if in_stock else ' oos'
-        cards += (f'<div class="pc{oos_cls}"><div class="pcimg"><span class="avdot {av_cls}"></span>{img_html}</div>'
+        if in_stock:
+            indicator = '<span class="avdot av"></span>'
+            oos_cls = ''
+        elif is_med:
+            indicator = '<span class="avreq">On Request</span>'
+            oos_cls = ''
+        else:
+            indicator = '<span class="avdot oos"></span>'
+            oos_cls = ' oos'
+        cards += (f'<div class="pc{oos_cls}"><div class="pcimg">{indicator}{img_html}</div>'
                   f'<div class="pcinf">'
                   f'<div class="pcnm">{name}</div>'
                   ''
                   f'{f"""<div class="pcref">{ref}</div>""" if ref else ""}'
                   f'</div></div>')
     pag = f'{e(brand)} · {page_num}/{total_pages}' if total_pages>1 else e(brand)
-    legend = '<span class="pplegend"><span class="avdot av" style="position:static;display:inline-block"></span> Available &nbsp; <span class="avdot oos" style="position:static;display:inline-block"></span> Out of Stock</span>'
+    legend = '<span class="pplegend"><span class="avdot av" style="position:static;display:inline-block"></span> Available &nbsp; <span class="avdot oos" style="position:static;display:inline-block"></span> Out of Stock &nbsp; <span class="avreq" style="position:static;font-size:7px">On Request</span> Medical Devices</span>'
     return f'''<div class="pg">
 <div class="pphd">
   <div class="pphd-l">{logo_html}<span class="ppbrand">{e(brand)}</span></div>
@@ -433,6 +441,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'NA',sans-serif;bac
 .avdot{position:absolute;top:7px;right:7px;width:9px;height:9px;border-radius:50%;border:1.5px solid #fff;z-index:2;box-shadow:0 1px 3px rgba(0,0,0,.15);}
 .avdot.av{background:#22c55e;}
 .avdot.oos{background:#c8cedf;}
+.avreq{position:absolute;top:7px;right:7px;background:var(--blue);color:#fff;font-size:7px;font-weight:700;letter-spacing:.04em;padding:2px 7px;border-radius:10px;z-index:2;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.15);}
 .pc.oos .pcimg img{opacity:.55;filter:grayscale(25%);}
 .pc.oos .pcnm{color:var(--g600);}
 .pc.oos .pcref{color:var(--g400);}
@@ -621,6 +630,12 @@ def generate_company(odoo, slug, dear_doctor):
     co = COMPANIES[slug]
     print(f'\n{"─"*56}\n  {co["name"]}  (company_id={co["id"]})\n{"─"*56}')
 
+    # Medical Devices eCommerce category IDs
+    med_cats = odoo('product.public.category','search_read',
+        [[['name','ilike','Medical Device']]],fields=['id','name'],limit=0)
+    med_cat_ids = {c['id'] for c in med_cats}
+    print(f'  Medical Device categories: {[c["name"] for c in med_cats]}')
+
     tmpl_ids, in_stock_tmpl = get_catalogue_data(odoo, co['id'])
     print(f'  Total templates: {len(tmpl_ids)} | In-stock: {len(in_stock_tmpl)}')
     if not tmpl_ids:
@@ -641,6 +656,7 @@ def generate_company(odoo, slug, dear_doctor):
         else:
             p['_img'] = process_image(p['image_1920'], p['id'])
         p['_in_stock'] = p['id'] in in_stock_tmpl
+        p['_is_medical_device'] = bool(set(p.get('public_categ_ids',[])) & med_cat_ids)
         primary = next((brand_map[t]['name'] for t in tids if t in brand_map), None)
         if primary and primary.strip().lower() not in ('service', 'services'):
             brand_products.setdefault(primary, []).append(p)
