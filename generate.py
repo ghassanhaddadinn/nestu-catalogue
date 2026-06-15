@@ -57,14 +57,29 @@ def connect_odoo():
     print(f'✓ Odoo connected (uid={uid})')
     return call
 
-def get_in_stock_tmpl_ids(odoo, company_id):
+def get_catalogue_data(odoo, company_id):
+    """Returns (all_tmpl_ids, in_stock_tmpl_ids) — ever-sold union current-stock."""
+    # Ever sold in this company
+    sol = odoo('sale.order.line','search_read',
+        [['order_id.company_id','=',company_id],['order_id.state','in',['sale','done']]],
+        fields=['product_id'], limit=0)
+    sold_pp = {l['product_id'][0] for l in sol if l['product_id']}
+    # Currently in stock
     quants = odoo('stock.quant','search_read',
         [['location_id.usage','=','internal'],['location_id.company_id','=',company_id],['quantity','>',0]],
         fields=['product_id'], limit=0)
-    if not quants: return set()
-    pp_ids = list({q['product_id'][0] for q in quants})
-    pp = odoo('product.product','search_read',[['id','in',pp_ids]],fields=['product_tmpl_id'],limit=0)
-    return {r['product_tmpl_id'][0] for r in pp}
+    stock_pp = {q['product_id'][0] for q in quants}
+    all_pp = sold_pp | stock_pp
+    if not all_pp: return set(), set()
+    pp_data = odoo('product.product','search_read',
+        [['id','in',list(all_pp)]],fields=['id','product_tmpl_id'],limit=0)
+    all_tmpl = set(); in_stock_tmpl = set()
+    for p in pp_data:
+        tid = p['product_tmpl_id'][0]
+        all_tmpl.add(tid)
+        if p['id'] in stock_pp:
+            in_stock_tmpl.add(tid)
+    return all_tmpl, in_stock_tmpl
 
 def get_product_templates(odoo, tmpl_ids):
     if not tmpl_ids: return []
@@ -124,7 +139,7 @@ def generate_index():
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NESTU® Veterinary Product Catalogues 2026</title>
+<title>NESTU® Veterinary Product Catalogues</title>
 <style>
 @font-face{font-family:'NA';src:url('fonts/NeulisAlt-Black.otf') format('opentype');font-weight:900;font-display:swap;}
 @font-face{font-family:'NA';src:url('fonts/NeulisAlt-Medium.otf') format('opentype');font-weight:500;font-display:swap;}
@@ -144,7 +159,7 @@ a.cat:hover{background:#2434A8;}
 <body>
 <div class="card">
   <div class="logo">NESTU<sup>®</sup></div>
-  <div class="sub">Veterinary Product Catalogues · 2026</div>
+  <div class="sub">Veterinary Product Catalogues</div>
   <div class="links">
     <a class="cat" href="jordan.html">Jordan Catalogue</a>
     <a class="cat" href="uae.html">UAE Catalogue</a>
@@ -278,9 +293,12 @@ def page_products(brand, products, page_num, total_pages, logo_b64=None):
         ref  = e(p.get('default_code') or '')
         cat  = e((p.get('categ_id') or [False,''])[1] or '')
         img  = p.get('_img')
+        in_stock = p.get('_in_stock', True)
+        av_cls = 'av' if in_stock else 'oos'
         img_html = (f'<img src="data:image/png;base64,{img}" alt="{name}">'
                     if img else f'<span class="pcph">{e(str(p.get("name","P"))[0].upper())}</span>')
-        cards += (f'<div class="pc"><div class="pcimg">{img_html}</div>'
+        oos_cls = '' if in_stock else ' oos'
+        cards += (f'<div class="pc{oos_cls}"><div class="pcimg"><span class="avdot {av_cls}"></span>{img_html}</div>'
                   f'<div class="pcinf">'
                   f'<div class="pcnm">{name}</div>'
                   ''
@@ -407,8 +425,14 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'NA',sans-serif;bac
 .ppgrid{flex:1;min-height:0;padding:12px 24px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:10px;}
 .pc{border:0.5px solid var(--g200);border-radius:7px;overflow:hidden;display:flex;flex-direction:column;min-height:0;transition:border-color .15s;}
 .pc:hover{border-color:var(--blue);}
-.pcimg{flex:1;min-height:0;background:#fff;display:flex;align-items:center;justify-content:center;border-bottom:0.5px solid var(--g100);overflow:hidden;}
+.pcimg{flex:1;min-height:0;background:#fff;display:flex;align-items:center;justify-content:center;border-bottom:0.5px solid var(--g100);overflow:hidden;position:relative;}
 .pcimg img{max-width:100%;max-height:100%;object-fit:contain;padding:8px;}
+.avdot{position:absolute;top:7px;right:7px;width:9px;height:9px;border-radius:50%;border:1.5px solid #fff;z-index:2;box-shadow:0 1px 3px rgba(0,0,0,.15);}
+.avdot.av{background:#22c55e;}
+.avdot.oos{background:#c8cedf;}
+.pc.oos .pcimg img{opacity:.55;filter:grayscale(25%);}
+.pc.oos .pcnm{color:var(--g600);}
+.pc.oos .pcref{color:var(--g400);}
 .pcph{font-family:'NA';font-size:42px;font-weight:900;color:var(--g200);}
 .pcinf{flex-shrink:0;padding:8px 10px 9px;display:flex;flex-direction:column;gap:3px;}
 .pcnm{font-size:13px;font-weight:700;color:var(--tx);line-height:1.3;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
@@ -593,10 +617,10 @@ def generate_company(odoo, slug, dear_doctor):
     co = COMPANIES[slug]
     print(f'\n{"─"*56}\n  {co["name"]}  (company_id={co["id"]})\n{"─"*56}')
 
-    tmpl_ids = get_in_stock_tmpl_ids(odoo, co['id'])
-    print(f'  In-stock templates: {len(tmpl_ids)}')
+    tmpl_ids, in_stock_tmpl = get_catalogue_data(odoo, co['id'])
+    print(f'  Total templates: {len(tmpl_ids)} | In-stock: {len(in_stock_tmpl)}')
     if not tmpl_ids:
-        print('  SKIP — no in-stock products'); return []
+        print('  SKIP — no products found (no sales history and no stock)'); return []
 
     products = get_product_templates(odoo, tmpl_ids)
     all_tag_ids = set()
@@ -612,6 +636,7 @@ def generate_company(odoo, slug, dear_doctor):
             missing_images.append(p.get('name', f"ID:{p['id']}"))
         else:
             p['_img'] = process_image(p['image_1920'], p['id'])
+        p['_in_stock'] = p['id'] in in_stock_tmpl
         primary = next((brand_map[t]['name'] for t in tids if t in brand_map), None)
         if primary:
             brand_products.setdefault(primary, []).append(p)
@@ -626,7 +651,7 @@ def generate_company(odoo, slug, dear_doctor):
     sorted_brands = sorted(brand_products, key=str.lower)
     for bn in sorted_brands:
         # Sort products: species-aware for Purina, alphabetical otherwise
-        brand_products[bn].sort(key=lambda p: species_sort_key(p, bn))
+        brand_products[bn].sort(key=lambda p: (0 if p.get('_in_stock') else 1, species_sort_key(p, bn)))
 
     pages = []; page_info = []
 
