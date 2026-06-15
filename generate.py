@@ -661,6 +661,9 @@ def generate_company(odoo, slug, dear_doctor):
         if primary and primary.strip().lower() not in ('service', 'services'):
             brand_products.setdefault(primary, []).append(p)
 
+    med_oos = sum(1 for pp in brand_products.values() for p in pp if p.get('_is_medical_device') and not p.get('_in_stock'))
+    med_total = sum(1 for pp in brand_products.values() for p in pp if p.get('_is_medical_device'))
+    print(f'  Medical devices: {med_total} total, {med_oos} showing On Request')
     if excluded: print(f'  Excluded (filter): {excluded}')
     if missing_images:
         print(f'\n  ⚠ MISSING IMAGES ({len(missing_images)}):')
