@@ -30,6 +30,7 @@ PRODUCTS_PER_PAGE = 9   # 3 cols × 3 rows
 EXCLUDE_CATEG_IDS      = []
 EXCLUDE_NAME_CONTAINS  = []
 EXCLUDE_CODE_AND_NAME  = [('PPP5','kit'),('PPP5','bin')]
+EXCLUDE_EXACT_CODES    = {'PPP50235'}
 
 COMPANIES = {
     'jordan': {'id':2,'name':'Jordan','slug':'jordan',
@@ -203,6 +204,7 @@ def should_exclude(p):
     name_lower = (p.get('name') or '').lower()
     for prefix, keyword in EXCLUDE_CODE_AND_NAME:
         if ref.startswith(prefix.upper()) and keyword.lower() in name_lower: return True
+    if ref in EXCLUDE_EXACT_CODES: return True
     return False
 
 # ── PAGE BUILDERS ────────────────────────────────────────────────────────────
@@ -305,13 +307,14 @@ def page_products(brand, products, page_num, total_pages, logo_b64=None):
                   f'{f"""<div class="pcref">{ref}</div>""" if ref else ""}'
                   f'</div></div>')
     pag = f'{e(brand)} · {page_num}/{total_pages}' if total_pages>1 else e(brand)
+    legend = '<span class="pplegend"><span class="avdot av" style="position:static;display:inline-block"></span> Available &nbsp; <span class="avdot oos" style="position:static;display:inline-block"></span> Out of Stock</span>'
     return f'''<div class="pg">
 <div class="pphd">
   <div class="pphd-l">{logo_html}<span class="ppbrand">{e(brand)}</span></div>
   <span class="pplogo">NESTU<sup>®</sup></span>
 </div>
 <div class="ppgrid">{cards}</div>
-<div class="pppage">{pag}</div>
+<div class="pppage"><span>{pag}</span>{legend}</div>
 </div>'''
 
 def page_closing(co):
@@ -437,7 +440,8 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'NA',sans-serif;bac
 .pcinf{flex-shrink:0;padding:8px 10px 9px;display:flex;flex-direction:column;gap:3px;}
 .pcnm{font-size:13px;font-weight:700;color:var(--tx);line-height:1.3;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
 .pcref{font-size:10.5px;color:var(--g400);letter-spacing:.02em;}
-.pppage{padding:5px 30px;text-align:center;font-size:9px;color:var(--g400);flex-shrink:0;}
+.pppage{padding:5px 20px;display:flex;justify-content:space-between;align-items:center;font-size:9px;color:var(--g400);flex-shrink:0;}
+.pplegend{display:flex;align-items:center;gap:5px;font-size:8.5px;color:var(--g600);}
 /* CLOSING */
 .cls{background:var(--blue)!important;align-items:center;justify-content:center;}
 .cls::after{content:'N';position:absolute;bottom:-45px;right:-18px;font-family:'NA';font-weight:900;font-size:600px;line-height:1;color:rgba(255,255,255,.04);pointer-events:none;user-select:none;}
@@ -638,7 +642,7 @@ def generate_company(odoo, slug, dear_doctor):
             p['_img'] = process_image(p['image_1920'], p['id'])
         p['_in_stock'] = p['id'] in in_stock_tmpl
         primary = next((brand_map[t]['name'] for t in tids if t in brand_map), None)
-        if primary:
+        if primary and primary.strip().lower() not in ('service', 'services'):
             brand_products.setdefault(primary, []).append(p)
 
     if excluded: print(f'  Excluded (filter): {excluded}')
