@@ -30,7 +30,7 @@ PRODUCTS_PER_PAGE = 9   # 3 cols × 3 rows
 EXCLUDE_CATEG_IDS      = []
 EXCLUDE_NAME_CONTAINS  = []
 EXCLUDE_CODE_AND_NAME  = [('PPP5','kit'),('PPP5','bin'),('SV','')]
-EXCLUDE_EXACT_CODES    = {'PPP50235'}
+EXCLUDE_EXACT_CODES    = {'PPP50235','RM10010','RM10025','RM10020','WE10170'}
 
 COMPANIES = {
     'jordan': {'id':2,'name':'Jordan','slug':'jordan',
