@@ -29,7 +29,7 @@ PRODUCTS_PER_PAGE = 9   # 3 cols × 3 rows
 
 EXCLUDE_CATEG_IDS      = []
 EXCLUDE_NAME_CONTAINS  = []
-EXCLUDE_CODE_AND_NAME  = [('PPP5','kit'),('PPP5','bin')]
+EXCLUDE_CODE_AND_NAME  = [('PPP5','kit'),('PPP5','bin'),('SV','')]
 EXCLUDE_EXACT_CODES    = {'PPP50235'}
 
 COMPANIES = {
