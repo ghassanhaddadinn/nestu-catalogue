@@ -631,10 +631,10 @@ def generate_company(odoo, slug, dear_doctor):
     print(f'\n{"─"*56}\n  {co["name"]}  (company_id={co["id"]})\n{"─"*56}')
 
     # Medical Devices eCommerce category IDs
-    med_cats = odoo('product.public.category','search_read',
-        [[['name','ilike','Medical Device']]],fields=['id','name'],limit=0)
-    med_cat_ids = {c['id'] for c in med_cats}
-    print(f'  Medical Device categories: {[c["name"] for c in med_cats]}')
+    _all_pub_cats = odoo('product.public.category','search_read',
+        [],fields=['id','name'],limit=0)
+    med_cat_ids = {c['id'] for c in _all_pub_cats if 'medical' in (c.get('name') or '').lower()}
+    print(f'  Medical Device cat IDs: {med_cat_ids}')
 
     tmpl_ids, in_stock_tmpl = get_catalogue_data(odoo, co['id'])
     print(f'  Total templates: {len(tmpl_ids)} | In-stock: {len(in_stock_tmpl)}')
