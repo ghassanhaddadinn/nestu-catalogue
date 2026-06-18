@@ -1,0 +1,36 @@
+name: NESTU Portal Crawler
+on:
+  workflow_dispatch:
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Playwright + Chromium
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: Run crawler
+        env:
+          PORTAL_EMAIL: ${{ secrets.PORTAL_EMAIL }}
+          PORTAL_PASSWORD: ${{ secrets.PORTAL_PASSWORD }}
+        run: python3 portal_crawler.py
+
+      - name: Commit screenshots to portal-screenshots branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:$GITHUB_TOKEN@github.com/ghassanhaddadinn/nestu-catalogue.git
+          git checkout -B portal-screenshots
+          git add portal_screenshots/ portal_data.json
+          git commit -m "Portal crawl $(date -u +%Y%m%dT%H%M%SZ)"
+          git push -f origin portal-screenshots
