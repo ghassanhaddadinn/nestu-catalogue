@@ -172,6 +172,8 @@ a.cat:hover{background:#2434A8;}
 </html>"""
     (OUTPUT_DIR/'index.html').write_text(html, encoding='utf-8')
     print('  ✓ docs/index.html')
+    # Write CNAME file so GitHub Pages custom domain persists across Action runs
+    with open('docs/CNAME','w') as f: f.write('www.nestu.io')
 
 # ── HELPERS ──────────────────────────────────────────────────────────────────
 
