@@ -649,21 +649,32 @@ def generate_company(odoo, slug, dear_doctor):
     if not tmpl_ids:
         print('  SKIP — no products found (no sales history and no stock)'); return []
 
-    # Cross-company On Request products
+    # Cross-company On Request products — filter to brand BEFORE fetching details
     cross_config = CROSS_COMPANY_ON_REQUEST.get(slug, [])
     cross_tmpl_ids = set()
+    _all_tags = odoo('product.tag','search_read',[],fields=['id','name'],limit=0) if cross_config else []
     for _brand_kw, _src_co in cross_config:
+        # 1. Find tag IDs matching the brand keyword
+        _btag_ids = [t['id'] for t in _all_tags if _brand_kw.lower() in (t.get('name') or '').lower()]
+        if not _btag_ids:
+            print(f'  Cross-company: no tag found for {_brand_kw}'); continue
+        # 2. Get in-stock product.product IDs from source company
         _sq = odoo('stock.quant','search_read',
             [['location_id.usage','=','internal'],['location_id.company_id','=',_src_co],['quantity','>',0]],
             fields=['product_id'],limit=0)
         _src_pp = list({q['product_id'][0] for q in _sq})
-        if _src_pp:
-            _pp = odoo('product.product','search_read',
-                [['id','in',_src_pp]],fields=['id','product_tmpl_id'],limit=0)
-            _new = {p['product_tmpl_id'][0] for p in _pp} - tmpl_ids
-            cross_tmpl_ids |= _new
-    if cross_tmpl_ids:
-        print(f'  Cross-company candidates: {len(cross_tmpl_ids)}')
+        if not _src_pp: continue
+        # 3. Map to templates
+        _pp = odoo('product.product','search_read',
+            [['id','in',_src_pp]],fields=['id','product_tmpl_id'],limit=0)
+        _src_tmpl = {p['product_tmpl_id'][0] for p in _pp}
+        # 4. Filter to brand-tagged templates only (avoid huge payload)
+        _brand_t = odoo('product.template','search_read',
+            [['product_tag_ids','in',_btag_ids]],fields=['id'],limit=0)
+        _brand_tmpl = {t['id'] for t in _brand_t}
+        _new = (_src_tmpl & _brand_tmpl) - tmpl_ids
+        cross_tmpl_ids |= _new
+        print(f'  Cross-company {_brand_kw}: {len(_new)} templates added')
 
     all_fetch_ids = tmpl_ids | cross_tmpl_ids
     products = get_product_templates(odoo, all_fetch_ids)
