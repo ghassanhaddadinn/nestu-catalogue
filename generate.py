@@ -32,6 +32,12 @@ EXCLUDE_NAME_CONTAINS  = []
 EXCLUDE_CODE_AND_NAME  = [('PPP5','kit'),('PPP5','bin'),('SV','')]
 EXCLUDE_EXACT_CODES    = {'PPP50235','RM10010','RM10025','RM10020','WE10170'}
 
+# Cross-company On Request: show products in stock at source_company as On Request in target catalogue
+# Format: {slug: [(brand_name_contains, source_company_id), ...]}
+CROSS_COMPANY_ON_REQUEST = {
+    'jordan': [('Rita Leibinger', 3)],   # UAE Rita Leibinger stock → Jordan as On Request
+}
+
 COMPANIES = {
     'jordan': {'id':2,'name':'Jordan','slug':'jordan',
                'entity':'The Nest for Specialized Veterinary Therapeutics & Utilities Ltd.',
@@ -304,7 +310,7 @@ def page_products(brand, products, page_num, total_pages, logo_b64=None):
         if in_stock:
             indicator = '<span class="avdot av"></span>'
             oos_cls = ''
-        elif is_med:
+        elif is_med or p.get('_cross_company_or'):
             indicator = '<span class="avreq">On Request</span>'
             oos_cls = ''
         else:
@@ -643,7 +649,24 @@ def generate_company(odoo, slug, dear_doctor):
     if not tmpl_ids:
         print('  SKIP — no products found (no sales history and no stock)'); return []
 
-    products = get_product_templates(odoo, tmpl_ids)
+    # Cross-company On Request products
+    cross_config = CROSS_COMPANY_ON_REQUEST.get(slug, [])
+    cross_tmpl_ids = set()
+    for _brand_kw, _src_co in cross_config:
+        _sq = odoo('stock.quant','search_read',
+            [['location_id.usage','=','internal'],['location_id.company_id','=',_src_co],['quantity','>',0]],
+            fields=['product_id'],limit=0)
+        _src_pp = list({q['product_id'][0] for q in _sq})
+        if _src_pp:
+            _pp = odoo('product.product','search_read',
+                [['id','in',_src_pp]],fields=['id','product_tmpl_id'],limit=0)
+            _new = {p['product_tmpl_id'][0] for p in _pp} - tmpl_ids
+            cross_tmpl_ids |= _new
+    if cross_tmpl_ids:
+        print(f'  Cross-company candidates: {len(cross_tmpl_ids)}')
+
+    all_fetch_ids = tmpl_ids | cross_tmpl_ids
+    products = get_product_templates(odoo, all_fetch_ids)
     all_tag_ids = set()
     for p in products: all_tag_ids.update(p.get('product_tag_ids',[]))
     brand_map = get_brand_tags(odoo, all_tag_ids)
@@ -660,7 +683,15 @@ def generate_company(odoo, slug, dear_doctor):
         p['_in_stock'] = p['id'] in in_stock_tmpl
         p['_is_medical_device'] = bool(set(p.get('public_categ_ids',[])) & med_cat_ids)
         primary = next((brand_map[t]['name'] for t in tids if t in brand_map), None)
-        if primary and primary.strip().lower() not in ('service', 'services'):
+        if p['id'] in cross_tmpl_ids:
+            # Only include if brand matches a cross-company config entry
+            matched = next((kw for kw,_ in cross_config if kw.lower() in (primary or '').lower()), None)
+            if matched and primary and primary.strip().lower() not in ('service','services'):
+                p['_in_stock'] = False
+                p['_cross_company_or'] = True
+                brand_products.setdefault(primary, []).append(p)
+        elif primary and primary.strip().lower() not in ('service', 'services'):
+            p['_cross_company_or'] = False
             brand_products.setdefault(primary, []).append(p)
 
     med_oos = sum(1 for pp in brand_products.values() for p in pp if p.get('_is_medical_device') and not p.get('_in_stock'))
