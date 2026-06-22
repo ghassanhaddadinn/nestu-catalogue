@@ -39,8 +39,8 @@ CROSS_COMPANY_ON_REQUEST = {
     'ksa':    [('Rita Leibinger', 3)],   # UAE Rita Leibinger → KSA On Request
 }
 
-# Specific SKUs forced to show On Request in a catalogue (product exists locally but not yet stocked)
-FORCE_ON_REQUEST_SKUS = {
+# Specific SKUs to inject into a catalogue as On Request (even if no local sales/stock)
+FORCE_ADD_ON_REQUEST_SKUS = {
     'ksa': {'OZL20000', 'OZL20005'},
 }
 
@@ -682,7 +682,18 @@ def generate_company(odoo, slug, dear_doctor):
         cross_tmpl_ids |= _new
         print(f'  Cross-company {_brand_kw}: {len(_new)} templates added')
 
-    all_fetch_ids = tmpl_ids | cross_tmpl_ids
+    # Inject forced SKUs (add to catalogue even with no local sales/stock)
+    forced_skus = FORCE_ADD_ON_REQUEST_SKUS.get(slug, set())
+    forced_tmpl_ids = set()
+    if forced_skus:
+        _forced_pp = odoo('product.template','search_read',
+            [['default_code','in',list(forced_skus)]],
+            fields=['id'],limit=0)
+        forced_tmpl_ids = {p['id'] for p in _forced_pp} - tmpl_ids - cross_tmpl_ids
+        if forced_tmpl_ids:
+            print(f'  Forced On Request SKUs injected: {len(forced_tmpl_ids)}')
+
+    all_fetch_ids = tmpl_ids | cross_tmpl_ids | forced_tmpl_ids
     products = get_product_templates(odoo, all_fetch_ids)
     all_tag_ids = set()
     for p in products: all_tag_ids.update(p.get('product_tag_ids',[]))
@@ -700,7 +711,7 @@ def generate_company(odoo, slug, dear_doctor):
         p['_in_stock'] = p['id'] in in_stock_tmpl
         p['_is_medical_device'] = bool(set(p.get('public_categ_ids',[])) & med_cat_ids)
         _ref = (p.get('default_code') or '').upper()
-        if _ref in FORCE_ON_REQUEST_SKUS.get(slug, set()):
+        if p['id'] in forced_tmpl_ids or _ref in FORCE_ADD_ON_REQUEST_SKUS.get(slug, set()):
             p['_in_stock'] = False
             p['_force_on_request'] = True
         else:
