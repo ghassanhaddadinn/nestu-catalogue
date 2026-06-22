@@ -35,7 +35,13 @@ EXCLUDE_EXACT_CODES    = {'PPP50235','RM10010','RM10025','RM10020','WE10170'}
 # Cross-company On Request: show products in stock at source_company as On Request in target catalogue
 # Format: {slug: [(brand_name_contains, source_company_id), ...]}
 CROSS_COMPANY_ON_REQUEST = {
-    'jordan': [('Rita Leibinger', 3)],   # UAE Rita Leibinger stock → Jordan as On Request
+    'jordan': [('Rita Leibinger', 3)],   # UAE Rita Leibinger → Jordan On Request
+    'ksa':    [('Rita Leibinger', 3)],   # UAE Rita Leibinger → KSA On Request
+}
+
+# Specific SKUs forced to show On Request in a catalogue (product exists locally but not yet stocked)
+FORCE_ON_REQUEST_SKUS = {
+    'ksa': {'OZL20000', 'OZL20005'},
 }
 
 COMPANIES = {
@@ -310,7 +316,7 @@ def page_products(brand, products, page_num, total_pages, logo_b64=None):
         if in_stock:
             indicator = '<span class="avdot av"></span>'
             oos_cls = ''
-        elif is_med or p.get('_cross_company_or'):
+        elif is_med or p.get('_cross_company_or') or p.get('_force_on_request'):
             indicator = '<span class="avreq">On Request</span>'
             oos_cls = ''
         else:
@@ -693,6 +699,12 @@ def generate_company(odoo, slug, dear_doctor):
             p['_img'] = process_image(p['image_1920'], p['id'])
         p['_in_stock'] = p['id'] in in_stock_tmpl
         p['_is_medical_device'] = bool(set(p.get('public_categ_ids',[])) & med_cat_ids)
+        _ref = (p.get('default_code') or '').upper()
+        if _ref in FORCE_ON_REQUEST_SKUS.get(slug, set()):
+            p['_in_stock'] = False
+            p['_force_on_request'] = True
+        else:
+            p['_force_on_request'] = False
         primary = next((brand_map[t]['name'] for t in tids if t in brand_map), None)
         if p['id'] in cross_tmpl_ids:
             # Only include if brand matches a cross-company config entry
