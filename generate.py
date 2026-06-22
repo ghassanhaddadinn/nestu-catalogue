@@ -44,6 +44,11 @@ FORCE_ADD_ON_REQUEST_SKUS = {
     'ksa': {'OZL20000', 'OZL20005'},
 }
 
+# Hide products with these SKU prefixes when out of stock in a specific catalogue
+HIDE_WHEN_OOS_PREFIXES = {
+    'jordan': ['VNJO'],
+}
+
 COMPANIES = {
     'jordan': {'id':2,'name':'Jordan','slug':'jordan',
                'entity':'The Nest for Specialized Veterinary Therapeutics & Utilities Ltd.',
@@ -717,6 +722,12 @@ def generate_company(odoo, slug, dear_doctor):
         else:
             p['_force_on_request'] = False
         primary = next((brand_map[t]['name'] for t in tids if t in brand_map), None)
+        # Hide OOS products with specific SKU prefixes
+        _oos_pfxs = HIDE_WHEN_OOS_PREFIXES.get(slug, [])
+        if _oos_pfxs and not p.get('_in_stock') and not p.get('_force_on_request') and not p.get('_cross_company_or', False):
+            if any(_ref.startswith(pfx.upper()) for pfx in _oos_pfxs):
+                excluded += 1; continue
+
         if p['id'] in cross_tmpl_ids:
             # Only include if brand matches a cross-company config entry
             matched = next((kw for kw,_ in cross_config if kw.lower() in (primary or '').lower()), None)
@@ -742,6 +753,27 @@ def generate_company(odoo, slug, dear_doctor):
     for bn in sorted_brands:
         # Sort products: species-aware for Purina, alphabetical otherwise
         brand_products[bn].sort(key=lambda p: (0 if p.get('_in_stock') else 1, species_sort_key(p, bn)))
+
+    # Jordan VNJO deduplication: suppress VNJO{X} when VN{X} is also in stock
+    if slug == 'jordan':
+        # Build map: suffix → whether VN{suffix} is in stock
+        vn_in_stock = set()
+        for pp in brand_products.values():
+            for p in pp:
+                ref = (p.get('default_code') or '').upper()
+                if ref.startswith('VN') and not ref.startswith('VNJO') and p.get('_in_stock'):
+                    vn_in_stock.add(ref[2:])  # store suffix e.g. '90510'
+        # Remove VNJO products whose VN counterpart is in stock
+        for bn in list(brand_products.keys()):
+            brand_products[bn] = [
+                p for p in brand_products[bn]
+                if not (
+                    (p.get('default_code') or '').upper().startswith('VNJO')
+                    and (p.get('default_code') or '').upper()[4:] in vn_in_stock
+                )
+            ]
+            if not brand_products[bn]:
+                del brand_products[bn]
 
     pages = []; page_info = []
 
