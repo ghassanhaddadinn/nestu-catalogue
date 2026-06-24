@@ -25,6 +25,8 @@ OUTPUT_DIR = BASE_DIR / 'docs'
 for d in [CACHE_DIR, OUTPUT_DIR, CONFIG_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
+FAVICON_B64 = "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"
+
 PRODUCTS_PER_PAGE = 9   # 3 cols × 3 rows
 
 EXCLUDE_CATEG_IDS      = []
@@ -157,6 +159,7 @@ def generate_index():
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="favicon.ico">
 <title>NESTU® Veterinary Product Catalogues</title>
 <style>
 @font-face{font-family:'NA';src:url('fonts/NeulisAlt-Black.otf') format('opentype');font-weight:900;font-display:swap;}
@@ -191,6 +194,8 @@ a.cat:hover{background:#2434A8;}
     print('  ✓ docs/index.html')
     # Write CNAME file so GitHub Pages custom domain persists across Action runs
     with open('docs/CNAME','w') as f: f.write('www.nestu.io')
+    import base64 as _b64
+    with open('docs/favicon.ico','wb') as f: f.write(_b64.b64decode(FAVICON_B64))
 
 # ── HELPERS ──────────────────────────────────────────────────────────────────
 
