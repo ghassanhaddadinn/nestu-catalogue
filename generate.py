@@ -606,6 +606,7 @@ def build_html(pages, page_info, co, updated_at):
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" href="favicon.ico">
 <title>NESTU® {e(co['name'])} — Veterinary Product Catalogue 2026</title>
 <style>{CSS}</style>
 </head>
