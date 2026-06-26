@@ -52,15 +52,15 @@ HIDE_WHEN_OOS_PREFIXES = {
 }
 
 COMPANIES = {
-    'jordan': {'id':2,'name':'Jordan','slug':'jordan',
+    'jordan': {'id':2,'short_title':'JO','name':'Jordan','slug':'jordan',
                'entity':'The Nest for Specialized Veterinary Therapeutics & Utilities Ltd.',
                'address':'Oweym Ben Saeda St., Bldg. No. 46 · Amman, Jordan',
                'portal':'jordan.nestu.online'},
-    'uae':    {'id':3,'name':'UAE','slug':'uae',
+    'uae':    {'id':3,'short_title':'UAE','name':'UAE','slug':'uae',
                'entity':'NESTU Veterinary Medicines Trading L.L.C',
                'address':'Office 602, North Tower, Dubai Science Park · Dubai, UAE',
                'portal':'uae.nestu.online'},
-    'ksa':    {'id':4,'name':'KSA','slug':'ksa',
+    'ksa':    {'id':4,'short_title':'KSA','name':'KSA','slug':'ksa',
                'entity':'NESTU KSA','address':'Kingdom of Saudi Arabia',
                'portal':'uae.nestu.online'},
 }
@@ -160,7 +160,7 @@ def generate_index():
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="favicon.ico">
-<title>NESTU® Veterinary Product Catalogues</title>
+<title>NESTU PCs</title>
 <style>
 @font-face{font-family:'NA';src:url('fonts/NeulisAlt-Black.otf') format('opentype');font-weight:900;font-display:swap;}
 @font-face{font-family:'NA';src:url('fonts/NeulisAlt-Medium.otf') format('opentype');font-weight:500;font-display:swap;}
@@ -612,7 +612,7 @@ def build_html(pages, page_info, co, updated_at):
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="icon" href="favicon.ico">
-<title>NESTU® {e(co['name'])} — Veterinary Product Catalogue 2026</title>
+<title>NESTU {co['short_title']} PC</title>
 <style>{CSS}</style>
 </head>
 <body>
