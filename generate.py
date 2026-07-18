@@ -103,9 +103,15 @@ def get_catalogue_data(odoo, company_id):
 
 def get_product_templates(odoo, tmpl_ids):
     if not tmpl_ids: return []
-    return odoo('product.template','search_read',
-        [['id','in',list(tmpl_ids)],['active','=',True]],
-        fields=['id','name','product_tag_ids','default_code','categ_id','image_1920','public_categ_ids'],limit=0)
+    ids = list(tmpl_ids)
+    results = []
+    for i in range(0, len(ids), 80):
+        chunk = ids[i:i+80]
+        batch = odoo('product.template','search_read',
+            [['id','in',chunk],['active','=',True]],
+            fields=['id','name','product_tag_ids','default_code','categ_id','image_1920','public_categ_ids'],limit=0)
+        results.extend(batch)
+    return results
 
 def get_brand_tags(odoo, tag_ids):
     if not tag_ids: return {}
