@@ -87,7 +87,14 @@ Every 30 minutes, GitHub Actions runs `generate.py` which:
 1. Connects to Odoo via XML-RPC API
 2. Queries `stock.quant` per company (Jordan=2, UAE=3, KSA=4) for `qty > 0` in internal locations
 3. Fetches product templates, images, tags (brands), and categories
-4. Groups products by brand tag (alphabetical by brand, then by product name)
+4. Groups products:
+   - **Jordan / KSA** — by brand tag (alphabetical by brand, then by product name)
+   - **UAE** — by product category (Pharma → Consumables → Medical Devices → Nutraceuticals),
+     with a **Dental** subsection under Medical Devices holding the RWD dental range
+     (units, dental x-ray, accessories — listed in `DENTAL_*` in `generate.py`).
+     UAE cards also show the company list price (`AED`, from the company-dependent
+     `list_price` field) and, for Pharma, the active ingredient from
+     `config/active_ingredients.json`. The brand appears as a small label on the product image.
 5. Downloads and resizes product images (cached in `cache/images/` — not committed to repo)
 6. Generates a self-contained HTML flipbook per country
 7. Commits the updated `docs/*.html` files to GitHub Pages
@@ -132,7 +139,8 @@ nestu-catalogue/
 │   ├── logo_white.png
 │   └── logo_blue.png
 ├── config/
-│   └── dear_doctor.txt    Letter text (edit freely)
+│   ├── dear_doctor.txt          Letter text (edit freely)
+│   └── active_ingredients.json  SKU → active ingredient, UAE Pharma cards (edit freely)
 ├── cache/
 │   └── images/            Product image cache (gitignored)
 └── docs/                  GitHub Pages output

@@ -1,0 +1,33 @@
+{
+  "_about": "SKU -> active ingredient, shown under the product name on Pharma cards. Keys starting with '_' are ignored by generate.py. Add or edit freely; unlisted SKUs simply render no ingredient line.",
+  "_review": "KK70020 (Anthelmin Plus) and KK70070 (Otoxolan) compositions are not fully stated in Odoo and were taken from the manufacturer's standard formulation - please confirm before publishing.",
+
+  "KK70005": "Amoxicillin 40 mg / Clavulanic acid 10 mg",
+  "KK70010": "Amoxicillin 200 mg / Clavulanic acid 50 mg",
+  "KK70015": "Amoxicillin 400 mg / Clavulanic acid 100 mg",
+
+  "KK70020": "Febantel / Pyrantel embonate / Praziquantel",
+
+  "KK70025": "Milbemycin oxime 2.5 mg / Praziquantel 25 mg",
+  "KK70030": "Milbemycin oxime 12.5 mg / Praziquantel 125 mg",
+  "KK70035": "Milbemycin oxime 4 mg / Praziquantel 10 mg",
+  "KK70040": "Milbemycin oxime 16 mg / Praziquantel 40 mg",
+
+  "KK70045": "Fipronil 50 mg / (S)-methoprene 60 mg",
+  "KK70050": "Fipronil 67 mg / (S)-methoprene 60.3 mg",
+  "KK70055": "Fipronil 134 mg / (S)-methoprene 120.6 mg",
+  "KK70060": "Fipronil 268 mg / (S)-methoprene 241.2 mg",
+  "KK70065": "Fipronil 402 mg / (S)-methoprene 361.8 mg",
+
+  "KK70070": "Marbofloxacin / Clotrimazole / Dexamethasone acetate",
+
+  "KK70075": "Selamectin 120 mg",
+  "KK70080": "Selamectin 15 mg",
+  "KK70085": "Selamectin 240 mg",
+  "KK70090": "Selamectin 30 mg",
+  "KK70095": "Selamectin 45 mg",
+  "KK70100": "Selamectin 60 mg",
+
+  "LV100000": "Amoxicillin 50 mg / Clavulanic acid 12.5 mg",
+  "LV100005": "Amoxicillin 250 mg / Clavulanic acid 62.5 mg"
+}
