@@ -107,6 +107,9 @@ DENTAL_SKUS = {sku: rank for rank, group in
 # anything at or below this is treated as "no price" and the line is hidden.
 PRICE_PLACEHOLDER_MAX = 1.0
 
+# UAE list prices are stored VAT-exclusive but shown VAT-inclusive (5%).
+UAE_VAT_MULTIPLIER = 1.05
+
 # ── ODOO ────────────────────────────────────────────────────────────────────
 
 def connect_odoo():
@@ -908,8 +911,18 @@ def generate_company(odoo, slug, dear_doctor):
             p['_in_stock'] = False
             p['_force_on_request'] = True
         if by_category:
+            _lp = p.get('list_price')
+            if slug == 'uae':
+                # Gross up for VAT, but leave the 1.0 placeholder alone so
+                # format_price still recognises it as unpriced.
+                try:
+                    _lp = float(_lp)
+                    if _lp > PRICE_PLACEHOLDER_MAX:
+                        _lp *= UAE_VAT_MULTIPLIER
+                except (TypeError, ValueError):
+                    pass
             p['_price_str'] = (None if _uae_or
-                               else format_price(p.get('list_price'), co.get('currency','')))
+                               else format_price(_lp, co.get('currency','')))
         # Hide OOS products with specific SKU prefixes
         _oos_pfxs = HIDE_WHEN_OOS_PREFIXES.get(slug, [])
         if _oos_pfxs and not p.get('_in_stock') and not p.get('_force_on_request') and not p.get('_cross_company_or', False):
