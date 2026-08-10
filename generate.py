@@ -46,14 +46,11 @@ FORCE_ADD_ON_REQUEST_SKUS = {
     'ksa': {'OZL20000', 'OZL20005'},
 }
 
-# UAE only: always show as On Request, whatever the actual stock level
-FORCE_ON_REQUEST_UAE = {
-    'RWD60285','RWD60290','RWD60300','RWD60305','RWD60310','RWD60315','RWD60320',
-    'RWD60325','RWD60330','RWD60335','RWD60340','RWD60345','RWD60350','RWD60355',
-    'RWD60360','RWD60370','RWD60375','RWD60380','RWD60385','RWD60390','RWD60395',
-    'RWD60400','RWD60405','RWD60410','RWD60415','RWD60420',
-    'RL142101310','RL142152010','RL128088110','RL128082735','RL128054407',
-}
+# UAE only: always show as On Request with no price, whatever the actual stock
+# level — everything in Medical Devices & Equipment, plus the Rita Leibinger (RL)
+# brand wherever it sits.
+FORCE_ON_REQUEST_UAE_CATEG_IDS = {4}                       # Goods / Medical Devices & Equipment
+FORCE_ON_REQUEST_UAE_BRANDS    = ('rita leibinger', 'rl')  # matched against the brand tag name
 
 # Hide products with these SKU prefixes when out of stock in a specific catalogue
 HIDE_WHEN_OOS_PREFIXES = {
@@ -299,6 +296,18 @@ def format_price(value, currency):
     if v <= PRICE_PLACEHOLDER_MAX: return None
     amount = f'{v:,.0f}' if abs(v - round(v)) < 0.005 else f'{v:,.2f}'
     return f'{currency} {amount}'.strip()
+
+def uae_force_on_request(p, brand):
+    """UAE: Medical Devices & Equipment, the Rita Leibinger (RL) brand and the
+    whole RWD dental range always show as On Request, with the price suppressed.
+    The dental clause matters because Odoo files most dental accessories under
+    Consumables, so the category rule alone would miss them."""
+    if (p.get('categ_id') or [False])[0] in FORCE_ON_REQUEST_UAE_CATEG_IDS:
+        return True
+    if (p.get('default_code') or '').upper() in DENTAL_SKUS:
+        return True
+    b = (brand or '').lower()
+    return any(k in b for k in FORCE_ON_REQUEST_UAE_BRANDS)
 
 def section_for(p):
     """Map a product's Odoo category path onto a catalogue section title."""
@@ -892,13 +901,15 @@ def generate_company(odoo, slug, dear_doctor):
             p['_force_on_request'] = True
         else:
             p['_force_on_request'] = False
-        if slug == 'uae' and _ref in FORCE_ON_REQUEST_UAE:
-            p['_in_stock'] = False
-            p['_force_on_request'] = True
         primary = next((brand_map[t]['name'] for t in tids if t in brand_map), None)
         p['_brand'] = primary
+        _uae_or = slug == 'uae' and uae_force_on_request(p, primary)
+        if _uae_or:
+            p['_in_stock'] = False
+            p['_force_on_request'] = True
         if by_category:
-            p['_price_str'] = format_price(p.get('list_price'), co.get('currency',''))
+            p['_price_str'] = (None if _uae_or
+                               else format_price(p.get('list_price'), co.get('currency','')))
         # Hide OOS products with specific SKU prefixes
         _oos_pfxs = HIDE_WHEN_OOS_PREFIXES.get(slug, [])
         if _oos_pfxs and not p.get('_in_stock') and not p.get('_force_on_request') and not p.get('_cross_company_or', False):
