@@ -32,7 +32,7 @@ PRODUCTS_PER_PAGE = 9   # 3 cols × 3 rows
 EXCLUDE_CATEG_IDS      = []
 EXCLUDE_NAME_CONTAINS  = []
 EXCLUDE_CODE_AND_NAME  = [('PPP5','kit'),('PPP5','bin'),('SV','')]
-EXCLUDE_EXACT_CODES    = {'PPP50235','RM10010','RM10025','RM10020','WE10170'}
+EXCLUDE_EXACT_CODES    = {'PPP50235','RM10010','RM10025','RM10020','WE10170','RLZ-CATALOGUE 2026'}
 
 # Cross-company On Request: show products in stock at source_company as On Request in target catalogue
 # Format: {slug: [(brand_name_contains, source_company_id), ...]}
@@ -46,24 +46,69 @@ FORCE_ADD_ON_REQUEST_SKUS = {
     'ksa': {'OZL20000', 'OZL20005'},
 }
 
+# UAE only: always show as On Request, whatever the actual stock level
+FORCE_ON_REQUEST_UAE = {
+    'RWD60285','RWD60290','RWD60300','RWD60305','RWD60310','RWD60315','RWD60320',
+    'RWD60325','RWD60330','RWD60335','RWD60340','RWD60345','RWD60350','RWD60355',
+    'RWD60360','RWD60370','RWD60375','RWD60380','RWD60385','RWD60390','RWD60395',
+    'RWD60400','RWD60405','RWD60410','RWD60415','RWD60420',
+    'RL142101310','RL142152010','RL128088110','RL128082735','RL128054407',
+}
+
 # Hide products with these SKU prefixes when out of stock in a specific catalogue
 HIDE_WHEN_OOS_PREFIXES = {
     'jordan': ['VNJO'],
 }
 
 COMPANIES = {
-    'jordan': {'id':2,'short_title':'JO','name':'Jordan','slug':'jordan',
+    'jordan': {'id':2,'short_title':'JO','name':'Jordan','slug':'jordan','currency':'JOD',
                'entity':'The Nest for Specialized Veterinary Therapeutics & Utilities Ltd.',
                'address':'Oweym Ben Saeda St., Bldg. No. 46 · Amman, Jordan',
                'portal':'jordan.nestu.online'},
-    'uae':    {'id':3,'short_title':'UAE','name':'UAE','slug':'uae',
+    'uae':    {'id':3,'short_title':'UAE','name':'UAE','slug':'uae','currency':'AED',
                'entity':'NESTU Veterinary Medicines Trading L.L.C',
                'address':'Office 602, North Tower, Dubai Science Park · Dubai, UAE',
                'portal':'uae.nestu.online'},
-    'ksa':    {'id':4,'short_title':'KSA','name':'KSA','slug':'ksa',
+    'ksa':    {'id':4,'short_title':'KSA','name':'KSA','slug':'ksa','currency':'SAR',
                'entity':'NESTU KSA','address':'Kingdom of Saudi Arabia',
                'portal':'uae.nestu.online'},
 }
+
+# ── CATEGORY LAYOUT ─────────────────────────────────────────────────────────
+# Catalogues listed here are grouped by product category instead of by brand,
+# and show list price + active ingredient on the card. All other catalogues
+# keep the original brand-alphabetical layout untouched.
+CATEGORY_LAYOUT_SLUGS = {'uae'}
+
+# Section title → keywords matched against the product's category path
+# (product_template.categ_id display name, e.g. 'Goods / Medical Devices & Equipment').
+CATEGORY_SECTIONS = [
+    ('Pharma',          ['pharmaceutical', 'pharma']),
+    ('Consumables',     ['consumable']),
+    ('Medical Devices', ['medical device']),
+    ('Nutraceuticals',  ['nutraceutical']),
+]
+CATEGORY_FALLBACK_SECTION = 'Other'
+
+# RWD dental range — pulled into a Dental subsection under Medical Devices
+# regardless of the Odoo category each SKU sits in (accessories live under
+# Consumables in Odoo). Order within the subsection: units → x-ray → accessories.
+DENTAL_UNITS = ['RWD60035','RWD60230','RWD60255','RWD60240']
+DENTAL_XRAY  = ['RWD60080','RWD60091','RWD60092','RWD60245']
+DENTAL_ACCESSORIES = [
+    'RWD60105','RWD60106','RWD60285','RWD60290','RWD60300','RWD60305','RWD60310',
+    'RWD60315','RWD60320','RWD60325','RWD60330','RWD60335','RWD60340','RWD60345',
+    'RWD60350','RWD60355','RWD60360','RWD60365','RWD60370','RWD60375','RWD60380',
+    'RWD60385','RWD60390','RWD60395','RWD60400','RWD60405','RWD60415','RWD60420',
+]
+DENTAL_SUBSECTION = 'Dental'
+DENTAL_SKUS = {sku: rank for rank, group in
+               enumerate((DENTAL_UNITS, DENTAL_XRAY, DENTAL_ACCESSORIES))
+               for sku in group}
+
+# Odoo stores 1.0 as the unpriced placeholder on company-dependent list_price —
+# anything at or below this is treated as "no price" and the line is hidden.
+PRICE_PLACEHOLDER_MAX = 1.0
 
 # ── ODOO ────────────────────────────────────────────────────────────────────
 
@@ -101,15 +146,22 @@ def get_catalogue_data(odoo, company_id):
             in_stock_tmpl.add(tid)
     return all_tmpl, in_stock_tmpl
 
-def get_product_templates(odoo, tmpl_ids):
+def get_product_templates(odoo, tmpl_ids, company_id=None, extra_fields=None):
+    """company_id sets the read context so company-dependent fields (list_price)
+    resolve to that company's value."""
     if not tmpl_ids: return []
     ids = list(tmpl_ids)
+    fields = ['id','name','product_tag_ids','default_code','categ_id','image_1920','public_categ_ids']
+    for f in (extra_fields or []):
+        if f not in fields: fields.append(f)
+    kw = {'fields':fields,'limit':0}
+    if company_id:
+        kw['context'] = {'allowed_company_ids':[company_id],'company_id':company_id}
     results = []
     for i in range(0, len(ids), 80):
         chunk = ids[i:i+80]
         batch = odoo('product.template','search_read',
-            [['id','in',chunk],['active','=',True]],
-            fields=['id','name','product_tag_ids','default_code','categ_id','image_1920','public_categ_ids'],limit=0)
+            [['id','in',chunk],['active','=',True]], **kw)
         results.extend(batch)
     return results
 
@@ -224,6 +276,37 @@ def species_sort_key(p, brand_name):
     if cat and not dog:  return (1, n)
     return (2, n)
 
+def load_active_ingredients():
+    """SKU → active ingredient, from config/active_ingredients.json.
+    Keys starting with '_' are notes and ignored."""
+    path = CONFIG_DIR/'active_ingredients.json'
+    if not path.exists(): return {}
+    try:
+        data = json.loads(path.read_text(encoding='utf-8'))
+    except Exception as ex:
+        print(f'  ⚠ active_ingredients.json unreadable ({ex}) — ingredients skipped')
+        return {}
+    return {str(k).upper(): str(v).strip()
+            for k, v in data.items()
+            if not str(k).startswith('_') and str(v).strip()}
+
+def format_price(value, currency):
+    """None when unpriced or still on the 1.0 placeholder."""
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    if v <= PRICE_PLACEHOLDER_MAX: return None
+    amount = f'{v:,.0f}' if abs(v - round(v)) < 0.005 else f'{v:,.2f}'
+    return f'{currency} {amount}'.strip()
+
+def section_for(p):
+    """Map a product's Odoo category path onto a catalogue section title."""
+    path = ((p.get('categ_id') or [False,''])[1] or '').lower()
+    for title, keywords in CATEGORY_SECTIONS:
+        if any(k in path for k in keywords): return title
+    return None
+
 def should_exclude(p):
     categ_id = (p.get('categ_id') or [False])[0]
     if categ_id and categ_id in EXCLUDE_CATEG_IDS: return True
@@ -277,7 +360,7 @@ def page_letter(letter_text, co):
 </div>
 </div>'''
 
-def page_toc(entries):
+def page_toc(entries, intro=None):
     rows = ''.join(
         f'<li><div class="ta" onclick="gp({en["page_idx"]})">'
         f'<span class="tnum">{i+1:02d}</span>'
@@ -293,12 +376,12 @@ def page_toc(entries):
   <div class="pghd-t">Table of Contents</div>
 </div>
 <div class="tbd">
-  <p class="tintro">Click any brand to jump to its section. Products are sorted alphabetically within each brand. Tap the brand name in the nav bar at any time to open the quick-jump menu.</p>
+  <p class="tintro">{e(intro or "Click any brand to jump to its section. Products are sorted alphabetically within each brand. Tap the brand name in the nav bar at any time to open the quick-jump menu.")}</p>
   <ul class="tlist">{rows}</ul>
 </div>
 </div>'''
 
-def page_brand_divider(brand, num, total, count, logo_b64=None):
+def page_brand_divider(brand, num, total, count, logo_b64=None, kicker=None):
     initial = brand[0].upper()
     fs = brand_font_size(brand)
     logo_html = ''
@@ -307,7 +390,7 @@ def page_brand_divider(brand, num, total, count, logo_b64=None):
     return f'''<div class="pg bdiv" data-i="{e(initial)}">
 <div class="bd-in">
   {logo_html}
-  <div class="bdnum">Brand {num:02d} of {total:02d}</div>
+  <div class="bdnum">{e(kicker or f"Brand {num:02d} of {total:02d}")}</div>
   <div class="bdname" style="font-size:{fs}">{e(brand)}</div>
   <div class="bdrule"></div>
   <div class="bdcnt">{count} Product{"s" if count!=1 else ""} Available</div>
@@ -328,6 +411,16 @@ def page_products(brand, products, page_num, total_pages, logo_b64=None):
         is_med = p.get('_is_medical_device', False)
         img_html = (f'<img src="data:image/png;base64,{img}" alt="{name}">'
                     if img else f'<span class="pcph">{e(str(p.get("name","P"))[0].upper())}</span>')
+        # Category-grouped catalogues only: brand label, active ingredient, list price
+        brand_lbl = p.get('_brand_label')
+        ingredient = p.get('_ingredient')
+        price = p.get('_price_str')
+        brand_html = f'<span class="pcbl">{e(brand_lbl)}</span>' if brand_lbl else ''
+        if price:
+            ref_html = f'<span class="pcref">{ref}</span>' if ref else ''
+            meta = f'<div class="pcmeta">{ref_html}<span class="pcprc">{e(price)}</span></div>'
+        else:
+            meta = f'<div class="pcref">{ref}</div>' if ref else ''
         if in_stock:
             indicator = '<span class="avdot av"></span>'
             oos_cls = ''
@@ -337,11 +430,11 @@ def page_products(brand, products, page_num, total_pages, logo_b64=None):
         else:
             indicator = '<span class="avdot oos"></span>'
             oos_cls = ' oos'
-        cards += (f'<div class="pc{oos_cls}"><div class="pcimg">{indicator}{img_html}</div>'
+        cards += (f'<div class="pc{oos_cls}"><div class="pcimg">{indicator}{brand_html}{img_html}</div>'
                   f'<div class="pcinf">'
                   f'<div class="pcnm">{name}</div>'
-                  ''
-                  f'{f"""<div class="pcref">{ref}</div>""" if ref else ""}'
+                  f'{f"""<div class="pcai">{e(ingredient)}</div>""" if ingredient else ""}'
+                  f'{meta}'
                   f'</div></div>')
     pag = f'{e(brand)} · {page_num}/{total_pages}' if total_pages>1 else e(brand)
     legend = '<span class="pplegend"><span class="avdot av" style="position:static;display:inline-block"></span> Available &nbsp; <span class="avdot oos" style="position:static;display:inline-block"></span> Out of Stock &nbsp; <span class="avreq" style="position:static;font-size:7px">On Request</span> Medical Devices</span>'
@@ -477,6 +570,13 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'NA',sans-serif;bac
 .pcinf{flex-shrink:0;padding:8px 10px 9px;display:flex;flex-direction:column;gap:3px;}
 .pcnm{font-size:13px;font-weight:700;color:var(--tx);line-height:1.3;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
 .pcref{font-size:10.5px;color:var(--g400);letter-spacing:.02em;}
+.pcbl{position:absolute;top:7px;left:7px;max-width:calc(100% - 32px);background:rgba(255,255,255,.92);border:0.5px solid var(--g200);color:var(--g600);font-size:7px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:10px;z-index:2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pcai{font-size:9.5px;font-weight:500;color:var(--blue);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.pcmeta{display:flex;align-items:baseline;gap:8px;}
+.pcprc{margin-left:auto;font-size:10.5px;font-weight:700;color:var(--tx);white-space:nowrap;}
+.pc.oos .pcbl{opacity:.7;}
+.pc.oos .pcai{color:var(--g600);}
+.pc.oos .pcprc{color:var(--g400);}
 .pppage{padding:5px 20px;display:flex;justify-content:space-between;align-items:center;font-size:9px;color:var(--g400);flex-shrink:0;}
 .pplegend{display:flex;align-items:center;gap:5px;font-size:8.5px;color:var(--g600);}
 /* CLOSING */
@@ -655,6 +755,64 @@ def build_html(pages, page_info, co, updated_at):
 
 # ── MAIN ─────────────────────────────────────────────────────────────────────
 
+def build_category_blocks(brand_products, ingredients):
+    """Regroup brand-keyed products into category sections.
+
+    Returns a list of blocks in page order; the Dental block follows Medical
+    Devices. Each block: {'label','kicker','products'}.
+    """
+    sections = {title: [] for title, _ in CATEGORY_SECTIONS}
+    dental, unmapped = [], []
+
+    for prods in brand_products.values():
+        for p in prods:
+            ref = (p.get('default_code') or '').upper()
+            p['_brand_label'] = p.get('_brand') or ''
+            if ref in DENTAL_SKUS:
+                dental.append(p); continue
+            title = section_for(p)
+            if title is None:
+                unmapped.append(p); continue
+            sections[title].append(p)
+
+    if unmapped:
+        print(f'  ⚠ {len(unmapped)} product(s) outside the known categories → "{CATEGORY_FALLBACK_SECTION}":')
+        for p in unmapped:
+            print(f'      • {p.get("default_code") or p["id"]} — {(p.get("categ_id") or [0,"?"])[1]}')
+
+    # Brand-clustered inside each section, available first, then name
+    def sort_key(p):
+        brand = p.get('_brand') or ''
+        return (brand.lower(), 0 if p.get('_in_stock') else 1, species_sort_key(p, brand))
+    for prods in sections.values(): prods.sort(key=sort_key)
+    unmapped.sort(key=sort_key)
+    dental.sort(key=lambda p: (DENTAL_SKUS.get((p.get('default_code') or '').upper(), 99),
+                               0 if p.get('_in_stock') else 1,
+                               (p.get('name') or '').lower()))
+
+    # Active ingredient — pharma cards only
+    for p in sections.get('Pharma', []):
+        ing = ingredients.get((p.get('default_code') or '').upper())
+        if ing: p['_ingredient'] = ing
+
+    ordered = [t for t, _ in CATEGORY_SECTIONS if sections[t]]
+    if unmapped:
+        sections[CATEGORY_FALLBACK_SECTION] = unmapped
+        ordered.append(CATEGORY_FALLBACK_SECTION)
+
+    blocks = []
+    for i, title in enumerate(ordered):
+        blocks.append({'label':title, 'products':sections[title],
+                       'kicker':f'Category {i+1:02d} of {len(ordered):02d}'})
+        if title == 'Medical Devices' and dental:
+            blocks.append({'label':DENTAL_SUBSECTION, 'products':dental,
+                           'kicker':'Medical Devices · Subsection'})
+    if dental and not any(b['label'] == DENTAL_SUBSECTION for b in blocks):
+        blocks.append({'label':DENTAL_SUBSECTION, 'products':dental,
+                       'kicker':'Medical Devices · Subsection'})
+    return blocks
+
+
 def generate_company(odoo, slug, dear_doctor):
     co = COMPANIES[slug]
     print(f'\n{"─"*56}\n  {co["name"]}  (company_id={co["id"]})\n{"─"*56}')
@@ -708,8 +866,11 @@ def generate_company(odoo, slug, dear_doctor):
         if forced_tmpl_ids:
             print(f'  Forced On Request SKUs injected: {len(forced_tmpl_ids)}')
 
+    by_category = slug in CATEGORY_LAYOUT_SLUGS
     all_fetch_ids = tmpl_ids | cross_tmpl_ids | forced_tmpl_ids
-    products = get_product_templates(odoo, all_fetch_ids)
+    products = get_product_templates(odoo, all_fetch_ids,
+                                     company_id=co['id'] if by_category else None,
+                                     extra_fields=['list_price'] if by_category else None)
     all_tag_ids = set()
     for p in products: all_tag_ids.update(p.get('product_tag_ids',[]))
     brand_map = get_brand_tags(odoo, all_tag_ids)
@@ -731,7 +892,13 @@ def generate_company(odoo, slug, dear_doctor):
             p['_force_on_request'] = True
         else:
             p['_force_on_request'] = False
+        if slug == 'uae' and _ref in FORCE_ON_REQUEST_UAE:
+            p['_in_stock'] = False
+            p['_force_on_request'] = True
         primary = next((brand_map[t]['name'] for t in tids if t in brand_map), None)
+        p['_brand'] = primary
+        if by_category:
+            p['_price_str'] = format_price(p.get('list_price'), co.get('currency',''))
         # Hide OOS products with specific SKU prefixes
         _oos_pfxs = HIDE_WHEN_OOS_PREFIXES.get(slug, [])
         if _oos_pfxs and not p.get('_in_stock') and not p.get('_force_on_request') and not p.get('_cross_company_or', False):
@@ -793,31 +960,55 @@ def generate_company(odoo, slug, dear_doctor):
     page_info.append({'label':'Dear Doctor','type':'letter'})
     toc_idx = len(pages); pages.append(''); page_info.append({'label':'Contents','type':'toc'})
 
-    toc_entries = []
-    for b_idx, brand in enumerate(sorted_brands):
-        prods = brand_products[brand]
-        div_idx = len(pages)
-        toc_entries.append({'brand':brand,'count':len(prods),'page_idx':div_idx})
+    toc_entries = []; toc_intro = None
 
-        # Brand logo
-        tag_data = next((v for v in brand_map.values() if v.get('name')==brand), None)
-        logo_b64 = None
-        if tag_data:
-            raw = tag_data.get('image_1920') or tag_data.get('image_128')
-            if raw:
-                tid = next((k for k,v in brand_map.items() if v.get('name')==brand), 0)
-                logo_b64 = process_brand_image(raw, tid)
+    if by_category:
+        blocks = build_category_blocks(brand_products, load_active_ingredients())
+        priced = sum(1 for b in blocks for p in b['products'] if p.get('_price_str'))
+        total_prods = sum(len(b['products']) for b in blocks)
+        print('  Sections: ' + ', '.join(f'{b["label"]} ({len(b["products"])})' for b in blocks))
+        print(f'  List price shown on {priced}/{total_prods} products')
+        toc_intro = ('Click any category to jump to its section. Products are grouped by '
+                     'category and sorted by brand within each section. Tap the section name '
+                     'in the nav bar at any time to open the quick-jump menu.')
+        for blk in blocks:
+            prods = blk['products']; label = blk['label']
+            toc_label = f'Medical Devices · {label}' if label == DENTAL_SUBSECTION else label
+            toc_entries.append({'brand':toc_label,'count':len(prods),'page_idx':len(pages)})
 
-        pages.append(page_brand_divider(brand, b_idx+1, len(sorted_brands), len(prods), logo_b64))
-        page_info.append({'label':brand,'type':'divider','count':len(prods)})
+            pages.append(page_brand_divider(label, 1, 1, len(prods), None, kicker=blk['kicker']))
+            page_info.append({'label':toc_label,'type':'divider','count':len(prods)})
 
-        chunks = [prods[i:i+PRODUCTS_PER_PAGE] for i in range(0, len(prods), PRODUCTS_PER_PAGE)]
-        for ci, chunk in enumerate(chunks):
-            pages.append(page_products(brand, chunk, ci+1, len(chunks), logo_b64))
-            lbl = f'{brand} · {ci+1}/{len(chunks)}' if len(chunks)>1 else brand
-            page_info.append({'label':lbl,'type':'products'})
+            chunks = [prods[i:i+PRODUCTS_PER_PAGE] for i in range(0, len(prods), PRODUCTS_PER_PAGE)]
+            for ci, chunk in enumerate(chunks):
+                pages.append(page_products(toc_label, chunk, ci+1, len(chunks), None))
+                lbl = f'{toc_label} · {ci+1}/{len(chunks)}' if len(chunks)>1 else toc_label
+                page_info.append({'label':lbl,'type':'products'})
+    else:
+        for b_idx, brand in enumerate(sorted_brands):
+            prods = brand_products[brand]
+            div_idx = len(pages)
+            toc_entries.append({'brand':brand,'count':len(prods),'page_idx':div_idx})
 
-    pages[toc_idx] = page_toc(toc_entries)
+            # Brand logo
+            tag_data = next((v for v in brand_map.values() if v.get('name')==brand), None)
+            logo_b64 = None
+            if tag_data:
+                raw = tag_data.get('image_1920') or tag_data.get('image_128')
+                if raw:
+                    tid = next((k for k,v in brand_map.items() if v.get('name')==brand), 0)
+                    logo_b64 = process_brand_image(raw, tid)
+
+            pages.append(page_brand_divider(brand, b_idx+1, len(sorted_brands), len(prods), logo_b64))
+            page_info.append({'label':brand,'type':'divider','count':len(prods)})
+
+            chunks = [prods[i:i+PRODUCTS_PER_PAGE] for i in range(0, len(prods), PRODUCTS_PER_PAGE)]
+            for ci, chunk in enumerate(chunks):
+                pages.append(page_products(brand, chunk, ci+1, len(chunks), logo_b64))
+                lbl = f'{brand} · {ci+1}/{len(chunks)}' if len(chunks)>1 else brand
+                page_info.append({'label':lbl,'type':'products'})
+
+    pages[toc_idx] = page_toc(toc_entries, toc_intro)
     pages.append(page_closing(co))
     page_info.append({'label':'','type':'closing'})
 
