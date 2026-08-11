@@ -80,7 +80,7 @@ CATEGORY_LAYOUT_SLUGS = {'uae'}
 # Section title → keywords matched against the product's category path
 # (product_template.categ_id display name, e.g. 'Goods / Medical Devices & Equipment').
 CATEGORY_SECTIONS = [
-    ('Pharma',          ['pharmaceutical', 'pharma']),
+    ('Pharmaceuticals', ['pharmaceutical', 'pharma']),
     ('Consumables',     ['consumable']),
     ('Medical Devices', ['medical device']),
     ('Nutraceuticals',  ['nutraceutical']),
@@ -91,12 +91,16 @@ CATEGORY_FALLBACK_SECTION = 'Other'
 # regardless of the Odoo category each SKU sits in (accessories live under
 # Consumables in Odoo). Order within the subsection: units → x-ray → accessories.
 DENTAL_UNITS = ['RWD60035','RWD60230','RWD60255','RWD60240']
-DENTAL_XRAY  = ['RWD60080','RWD60091','RWD60092','RWD60245']
+DENTAL_XRAY  = [
+    'RWD60055','RWD60070','RWD60075','RWD60080','RWD60091','RWD60092','RWD60125',
+    'RWD60225','RWD60235','RWD60245','RWD60250',
+]
 DENTAL_ACCESSORIES = [
     'RWD60105','RWD60106','RWD60285','RWD60290','RWD60300','RWD60305','RWD60310',
     'RWD60315','RWD60320','RWD60325','RWD60330','RWD60335','RWD60340','RWD60345',
     'RWD60350','RWD60355','RWD60360','RWD60365','RWD60370','RWD60375','RWD60380',
-    'RWD60385','RWD60390','RWD60395','RWD60400','RWD60405','RWD60415','RWD60420',
+    'RWD60385','RWD60390','RWD60395','RWD60400','RWD60405','RWD60410','RWD60415',
+    'RWD60420',
 ]
 DENTAL_SUBSECTION = 'Dental'
 DENTAL_SKUS = {sku: rank for rank, group in
@@ -106,9 +110,6 @@ DENTAL_SKUS = {sku: rank for rank, group in
 # Odoo stores 1.0 as the unpriced placeholder on company-dependent list_price —
 # anything at or below this is treated as "no price" and the line is hidden.
 PRICE_PLACEHOLDER_MAX = 1.0
-
-# UAE list prices are stored VAT-exclusive but shown VAT-inclusive (5%).
-UAE_VAT_MULTIPLIER = 1.05
 
 # ── ODOO ────────────────────────────────────────────────────────────────────
 
@@ -796,14 +797,19 @@ def build_category_blocks(brand_products, ingredients):
     def sort_key(p):
         brand = p.get('_brand') or ''
         return (brand.lower(), 0 if p.get('_in_stock') else 1, species_sort_key(p, brand))
-    for prods in sections.values(): prods.sort(key=sort_key)
+    # Consumables only: Bifour sits after every other brand
+    def consumables_sort_key(p):
+        brand = p.get('_brand') or ''
+        return (1 if 'bifour' in brand.lower() else 0,) + sort_key(p)
+    for title, prods in sections.items():
+        prods.sort(key=consumables_sort_key if title == 'Consumables' else sort_key)
     unmapped.sort(key=sort_key)
     dental.sort(key=lambda p: (DENTAL_SKUS.get((p.get('default_code') or '').upper(), 99),
                                0 if p.get('_in_stock') else 1,
                                (p.get('name') or '').lower()))
 
     # Active ingredient — pharma cards only
-    for p in sections.get('Pharma', []):
+    for p in sections.get('Pharmaceuticals', []):
         ing = ingredients.get((p.get('default_code') or '').upper())
         if ing: p['_ingredient'] = ing
 
@@ -912,15 +918,6 @@ def generate_company(odoo, slug, dear_doctor):
             p['_force_on_request'] = True
         if by_category:
             _lp = p.get('list_price')
-            if slug == 'uae':
-                # Gross up for VAT, but leave the 1.0 placeholder alone so
-                # format_price still recognises it as unpriced.
-                try:
-                    _lp = float(_lp)
-                    if _lp > PRICE_PLACEHOLDER_MAX:
-                        _lp *= UAE_VAT_MULTIPLIER
-                except (TypeError, ValueError):
-                    pass
             p['_price_str'] = (None if _uae_or
                                else format_price(_lp, co.get('currency','')))
         # Hide OOS products with specific SKU prefixes
