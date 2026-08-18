@@ -632,6 +632,7 @@ const N=__N__,PI=__PI__;
 let c=0,bz=false,mOpen=false;
 
 function resize(){
+  if(window.visualViewport&&window.visualViewport.scale>1.05)return;
   const PW=820,PH=1160;
   const outer=document.querySelector('.stage-outer');
   const r=outer.getBoundingClientRect();
