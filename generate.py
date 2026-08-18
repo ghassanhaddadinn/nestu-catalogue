@@ -630,9 +630,11 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'NA',sans-serif;bac
 JS_TPL = """
 const N=__N__,PI=__PI__;
 let c=0,bz=false,mOpen=false;
+var _baseDPR=window.devicePixelRatio;
 
 function resize(){
   if(window.visualViewport&&window.visualViewport.scale>1.05)return;
+  if(window.devicePixelRatio!==_baseDPR)return;
   const PW=820,PH=1160;
   const outer=document.querySelector('.stage-outer');
   const r=outer.getBoundingClientRect();
