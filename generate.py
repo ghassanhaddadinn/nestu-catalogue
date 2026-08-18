@@ -489,8 +489,13 @@ CSS = """
 :root{--blue:#3040C4;--bdk:#2434A8;--g50:#f8f9fc;--g100:#eef0f8;--g200:#e0e4f2;--g400:#9ba5cc;--g600:#5f6d9e;--tx:#1a2040;}
 html,body{width:100%;height:100%;overflow:hidden;font-family:'NA',sans-serif;background:#c8cedf;}
 .viewer{width:100vw;height:100dvh;display:flex;flex-direction:column;position:relative;}
-.stage-outer{flex:1;min-height:0;display:flex;justify-content:center;align-items:center;padding:8px;}
-.stage{transform-origin:center center;}
+.stage-outer{flex:1;min-height:0;display:flex;justify-content:center;align-items:center;padding:8px;overflow:hidden;touch-action:none;}
+.stage-outer.pan{cursor:grab;}
+.stage-outer.pan:active{cursor:grabbing;}
+.stage{transform-origin:center center;will-change:transform;}
+.zreset{position:absolute;right:12px;bottom:64px;z-index:60;display:none;align-items:center;gap:6px;height:36px;padding:0 14px;border:none;border-radius:18px;background:rgba(26,32,64,.82);color:#fff;font-family:'NA',sans-serif;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.25);}
+.zreset.on{display:flex;}
+.zreset:hover{background:rgba(26,32,64,.95);}
 .pw{width:820px;height:1160px;position:relative;overflow:hidden;box-shadow:0 4px 28px rgba(30,36,72,0.25);}
 .nav{height:52px;background:var(--blue);flex-shrink:0;display:flex;align-items:center;padding:0 12px;gap:8px;}
 .nb{background:rgba(255,255,255,.18);color:#fff;border:none;width:36px;height:36px;border-radius:50%;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;flex-shrink:0;font-family:'NA',sans-serif;}
@@ -619,32 +624,143 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'NA',sans-serif;bac
 @media print{
   html,body{overflow:visible;height:auto;}
   .viewer{height:auto;}
-  .stage-outer{display:block;}
+  .stage-outer{display:block;overflow:visible;}
   .stage{transform:none!important;width:210mm!important;height:auto!important;}
   .pw{width:210mm!important;height:auto!important;box-shadow:none;}
   .pg{display:flex!important;position:relative;page-break-after:always;min-height:297mm;}
-  .nav,.overlay,.bpanel{display:none;}
+  .nav,.overlay,.bpanel,.zreset{display:none!important;}
 }
 """
 
 JS_TPL = """
 const N=__N__,PI=__PI__;
 let c=0,bz=false,mOpen=false;
-var _baseDPR=window.devicePixelRatio;
+
+// -- zoom / pan --------------------------------------------------------------
+// `fit` scales the 820x1160 page down to the viewport; `zoom` is the user's own
+// magnification on top of it; panX/panY are screen-pixel offsets applied before
+// the scale, so the composite is translate(pan) scale(fit*zoom).
+const PW=820,PH=1160,MINZ=1,MAXZ=4;
+let fit=1,zoom=1,panX=0,panY=0;
+const stageEl=()=>document.querySelector('.stage');
+const outerEl=()=>document.querySelector('.stage-outer');
+
+function clampPan(){
+  if(zoom<=1){panX=0;panY=0;return;}
+  const r=outerEl().getBoundingClientRect();
+  const mx=Math.max(0,(PW*fit*zoom-r.width)/2),my=Math.max(0,(PH*fit*zoom-r.height)/2);
+  panX=Math.min(mx,Math.max(-mx,panX));
+  panY=Math.min(my,Math.max(-my,panY));
+}
+
+function applyT(){
+  clampPan();
+  const stage=stageEl();
+  stage.style.transform=`translate(${panX}px,${panY}px) scale(${fit*zoom})`;
+  outerEl().classList.toggle('pan',zoom>1);
+  document.getElementById('zr').classList.toggle('on',zoom>1);
+}
 
 function resize(){
-  if(window.visualViewport&&window.visualViewport.scale>1.05)return;
-  if(window.devicePixelRatio!==_baseDPR)return;
-  const PW=820,PH=1160;
-  const outer=document.querySelector('.stage-outer');
-  const r=outer.getBoundingClientRect();
-  const scale=Math.min(r.width/PW,r.height/PH)*.98;
-  const stage=document.querySelector('.stage');
+  const r=outerEl().getBoundingClientRect();
+  fit=Math.min(r.width/PW,r.height/PH)*.98;
+  const stage=stageEl();
   stage.style.width=PW+'px'; stage.style.height=PH+'px';
-  stage.style.transform=`scale(${scale})`;
+  applyT();
 }
 window.addEventListener('resize',resize);
 window.addEventListener('orientationchange',()=>setTimeout(resize,100));
+
+// Scale by factor k while keeping whatever sits under (px,py) pinned there.
+// The stage scales about its centre, so the untransformed centre is at
+// (current rect centre - pan); the rest follows from that.
+function zoomAt(px,py,k){
+  const z=Math.min(MAXZ,Math.max(MINZ,zoom*k)),kk=z/zoom;
+  if(kk===1)return;
+  const r=stageEl().getBoundingClientRect();
+  const cx=r.left+r.width/2-panX,cy=r.top+r.height/2-panY;
+  panX=(px-cx)*(1-kk)+kk*panX;
+  panY=(py-cy)*(1-kk)+kk*panY;
+  zoom=z; applyT();
+}
+
+function resetZoom(){zoom=1;panX=0;panY=0;applyT();}
+
+// Ctrl+wheel, which is also what a trackpad pinch reports as.
+outerEl().addEventListener('wheel',ev=>{
+  if(!ev.ctrlKey)return;
+  ev.preventDefault();
+  zoomAt(ev.clientX,ev.clientY,Math.exp(-ev.deltaY*(ev.deltaMode===1?16:1)*0.002));
+},{passive:false});
+
+outerEl().addEventListener('dblclick',ev=>{ev.preventDefault();resetZoom();});
+
+// Mouse drag-to-pan, only live once zoomed in.
+let md=false,mlx=0,mly=0;
+outerEl().addEventListener('mousedown',ev=>{
+  if(zoom<=1)return;
+  md=true; mlx=ev.clientX; mly=ev.clientY; ev.preventDefault();
+});
+window.addEventListener('mousemove',ev=>{
+  if(!md)return;
+  panX+=ev.clientX-mlx; panY+=ev.clientY-mly;
+  mlx=ev.clientX; mly=ev.clientY; applyT();
+});
+window.addEventListener('mouseup',()=>{md=false;});
+
+// Touch: two fingers pinch-zoom about the midpoint; one finger pans when zoomed
+// and swipes between pages when not. Double-tap resets.
+let t0x=0,t0y=0,tlx=0,tly=0,tmoved=false,pinching=false,pd0=0,pz0=1,pmx=0,pmy=0,lastTap=0;
+const tdist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
+const tmid=t=>[(t[0].clientX+t[1].clientX)/2,(t[0].clientY+t[1].clientY)/2];
+
+outerEl().addEventListener('touchstart',ev=>{
+  if(ev.touches.length===2){
+    ev.preventDefault();
+    pinching=true; tmoved=true; pd0=tdist(ev.touches)||1; pz0=zoom;
+    [pmx,pmy]=tmid(ev.touches);
+  }else if(ev.touches.length===1){
+    t0x=tlx=ev.touches[0].clientX; t0y=tly=ev.touches[0].clientY; tmoved=false;
+  }
+},{passive:false});
+
+outerEl().addEventListener('touchmove',ev=>{
+  if(pinching&&ev.touches.length===2){
+    ev.preventDefault();
+    const [mx,my]=tmid(ev.touches);
+    panX+=mx-pmx; panY+=my-pmy; pmx=mx; pmy=my;
+    zoomAt(mx,my,Math.min(MAXZ,Math.max(MINZ,pz0*tdist(ev.touches)/pd0))/zoom);
+  }else if(ev.touches.length===1){
+    const t=ev.touches[0];
+    if(Math.abs(t.clientX-t0x)>6||Math.abs(t.clientY-t0y)>6)tmoved=true;
+    if(zoom>1){
+      ev.preventDefault();
+      panX+=t.clientX-tlx; panY+=t.clientY-tly; applyT();
+    }
+    tlx=t.clientX; tly=t.clientY;
+  }
+},{passive:false});
+
+outerEl().addEventListener('touchend',ev=>{
+  if(pinching){
+    if(ev.touches.length===0)pinching=false;
+    else if(ev.touches.length===1){
+      // Dropped to one finger mid-pinch: re-anchor so panning doesn't jump.
+      pinching=false; tmoved=true;
+      t0x=tlx=ev.touches[0].clientX; t0y=tly=ev.touches[0].clientY;
+    }
+    return;
+  }
+  if(ev.touches.length)return;
+  if(!tmoved){
+    const now=ev.timeStamp;
+    if(now-lastTap<300){lastTap=0;resetZoom();}else lastTap=now;
+    return;
+  }
+  if(zoom>1)return;
+  const dx=ev.changedTouches[0].clientX-t0x,dy=ev.changedTouches[0].clientY-t0y;
+  if(Math.abs(dx)>40&&Math.abs(dx)>Math.abs(dy))fl(dx<0?1:-1);
+},{passive:true});
 
 function upd(){
   document.getElementById('bp').disabled=c===0;
@@ -663,6 +779,7 @@ function upd(){
 
 function fl(dir){
   if(bz)return; const nx=c+dir;
+  if(zoom>1)resetZoom();
   if(nx<0||nx>=N)return; bz=true;
   const all=document.querySelectorAll('.pg');
   const ce=all[c],ne=all[nx];
@@ -673,6 +790,7 @@ function fl(dir){
 
 function gp(n){
   if(bz||n===c)return; const dir=n>c?1:-1; bz=true;
+  if(zoom>1)resetZoom();
   const all=document.querySelectorAll('.pg');
   const ce=all[c],ne=all[n];
   const ec=dir>0?'fxl':'fxr',en=dir>0?'fer':'fel';
@@ -714,13 +832,6 @@ document.addEventListener('keydown',ev=>{
   if(ev.key==='ArrowLeft')fl(-1);
   if(ev.key==='Escape'&&mOpen)toggleMenu();
 });
-let tx=0;
-document.querySelector('.pw').addEventListener('touchstart',ev=>{tx=ev.touches[0].clientX;},{passive:true});
-document.querySelector('.pw').addEventListener('touchend',ev=>{
-  const dx=ev.changedTouches[0].clientX-tx;
-  if(Math.abs(dx)>40)fl(dx<0?1:-1);
-},{passive:true});
-
 document.querySelectorAll('.pg')[0].classList.add('on');
 buildMenu(); resize(); upd();
 """
@@ -747,6 +858,7 @@ def build_html(pages, page_info, co, updated_at):
 {pages_html}
     </div></div>
   </div>
+  <button class="zreset" id="zr" onclick="resetZoom()">&#8634; Reset zoom</button>
   <div class="nav">
     <button class="nb" id="bp" onclick="fl(-1)" disabled>&#8592;</button>
     <div class="nav-mid">
