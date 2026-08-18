@@ -428,10 +428,14 @@ def page_products(brand, products, page_num, total_pages, logo_b64=None):
         brand_lbl = p.get('_brand_label')
         ingredient = p.get('_ingredient')
         price = p.get('_price_str')
+        rrp = p.get('_rrp_str')
         brand_html = f'<span class="pcbl">{e(brand_lbl)}</span>' if brand_lbl else ''
         if price:
             ref_html = f'<span class="pcref">{ref}</span>' if ref else ''
-            meta = f'<div class="pcmeta">{ref_html}<span class="pcprc">{e(price)}</span></div>'
+            price_lbl = 'WSP ' if p.get('_wsp') else ''
+            meta = f'<div class="pcmeta">{ref_html}<span class="pcprc">{price_lbl}{e(price)}</span></div>'
+            if rrp:
+                meta += f'<div class="pcrrp">RRP: {e(rrp)}</div>'
         else:
             meta = f'<div class="pcref">{ref}</div>' if ref else ''
         if in_stock:
@@ -589,6 +593,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'NA',sans-serif;bac
 .pcprc{margin-left:auto;font-size:10.5px;font-weight:700;color:var(--tx);white-space:nowrap;}
 .pc.oos .pcbl{opacity:.7;}
 .pc.oos .pcai{color:var(--g600);}
+.pcrrp{font-size:9.5px;font-weight:600;color:#e67e22;text-align:right;white-space:nowrap;}
 .pc.oos .pcprc{color:var(--g400);}
 .pppage{padding:5px 20px;display:flex;justify-content:space-between;align-items:center;font-size:9px;color:var(--g400);flex-shrink:0;}
 .pplegend{display:flex;align-items:center;gap:5px;font-size:8.5px;color:var(--g600);}
@@ -768,12 +773,16 @@ def build_html(pages, page_info, co, updated_at):
 
 # ── MAIN ─────────────────────────────────────────────────────────────────────
 
-def build_category_blocks(brand_products, ingredients):
+def build_category_blocks(brand_products, ingredients, slug=None, currency=''):
     """Regroup brand-keyed products into category sections.
 
     Returns a list of blocks in page order; the Dental block follows Medical
     Devices. Each block: {'label','kicker','products'}.
+
+    UAE only: the list price is labelled WSP and the recommended retail price
+    (x_rrp) is rendered on a second line when it is set.
     """
+    is_uae = slug == 'uae'
     sections = {title: [] for title, _ in CATEGORY_SECTIONS}
     dental, unmapped = [], []
 
@@ -781,6 +790,14 @@ def build_category_blocks(brand_products, ingredients):
         for p in prods:
             ref = (p.get('default_code') or '').upper()
             p['_brand_label'] = p.get('_brand') or ''
+            if is_uae:
+                p['_wsp'] = True
+                try:
+                    _rrp = float(p.get('x_rrp') or 0)
+                except (TypeError, ValueError):
+                    _rrp = 0.0
+                if _rrp > 0:
+                    p['_rrp_str'] = format_price(_rrp, currency)
             if ref in DENTAL_SKUS:
                 dental.append(p); continue
             title = section_for(p)
@@ -886,9 +903,13 @@ def generate_company(odoo, slug, dear_doctor):
 
     by_category = slug in CATEGORY_LAYOUT_SLUGS
     all_fetch_ids = tmpl_ids | cross_tmpl_ids | forced_tmpl_ids
+    # UAE also carries a recommended retail price alongside the wholesale list price
+    _extra_fields = None
+    if by_category:
+        _extra_fields = ['list_price'] + (['x_rrp'] if slug == 'uae' else [])
     products = get_product_templates(odoo, all_fetch_ids,
                                      company_id=co['id'] if by_category else None,
-                                     extra_fields=['list_price'] if by_category else None)
+                                     extra_fields=_extra_fields)
     all_tag_ids = set()
     for p in products: all_tag_ids.update(p.get('product_tag_ids',[]))
     brand_map = get_brand_tags(odoo, all_tag_ids)
@@ -984,7 +1005,8 @@ def generate_company(odoo, slug, dear_doctor):
     toc_entries = []; toc_intro = None
 
     if by_category:
-        blocks = build_category_blocks(brand_products, load_active_ingredients())
+        blocks = build_category_blocks(brand_products, load_active_ingredients(),
+                                       slug=slug, currency=co.get('currency',''))
         priced = sum(1 for b in blocks for p in b['products'] if p.get('_price_str'))
         total_prods = sum(len(b['products']) for b in blocks)
         print('  Sections: ' + ', '.join(f'{b["label"]} ({len(b["products"])})' for b in blocks))
