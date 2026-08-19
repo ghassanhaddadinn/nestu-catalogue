@@ -107,10 +107,6 @@ DENTAL_SKUS = {sku: rank for rank, group in
                enumerate((DENTAL_UNITS, DENTAL_XRAY, DENTAL_ACCESSORIES))
                for sku in group}
 
-# Odoo stores 1.0 as the unpriced placeholder on company-dependent list_price —
-# anything at or below this is treated as "no price" and the line is hidden.
-PRICE_PLACEHOLDER_MAX = 1.0
-
 # ── ODOO ────────────────────────────────────────────────────────────────────
 
 def connect_odoo():
@@ -148,8 +144,8 @@ def get_catalogue_data(odoo, company_id):
     return all_tmpl, in_stock_tmpl
 
 def get_product_templates(odoo, tmpl_ids, company_id=None, extra_fields=None):
-    """company_id sets the read context so company-dependent fields (list_price)
-    resolve to that company's value."""
+    """company_id sets the read context so company-dependent fields resolve to
+    that company's value."""
     if not tmpl_ids: return []
     ids = list(tmpl_ids)
     fields = ['id','name','product_tag_ids','default_code','categ_id','image_1920','public_categ_ids']
@@ -291,19 +287,9 @@ def load_active_ingredients():
             for k, v in data.items()
             if not str(k).startswith('_') and str(v).strip()}
 
-def format_price(value, currency):
-    """None when unpriced or still on the 1.0 placeholder."""
-    try:
-        v = float(value)
-    except (TypeError, ValueError):
-        return None
-    if v <= PRICE_PLACEHOLDER_MAX: return None
-    amount = f'{v:,.0f}' if abs(v - round(v)) < 0.005 else f'{v:,.2f}'
-    return f'{currency} {amount}'.strip()
-
 def uae_force_on_request(p, brand):
     """UAE: Medical Devices & Equipment, the Rita Leibinger (RL) brand and the
-    whole RWD dental range always show as On Request, with the price suppressed.
+    whole RWD dental range always show as On Request.
     The dental clause matters because Odoo files most dental accessories under
     Consumables, so the category rule alone would miss them."""
     if (p.get('categ_id') or [False])[0] in FORCE_ON_REQUEST_UAE_CATEG_IDS:
@@ -424,20 +410,11 @@ def page_products(brand, products, page_num, total_pages, logo_b64=None):
         is_med = p.get('_is_medical_device', False)
         img_html = (f'<img src="data:image/png;base64,{img}" alt="{name}">'
                     if img else f'<span class="pcph">{e(str(p.get("name","P"))[0].upper())}</span>')
-        # Category-grouped catalogues only: brand label, active ingredient, list price
+        # Category-grouped catalogues only: brand label, active ingredient
         brand_lbl = p.get('_brand_label')
         ingredient = p.get('_ingredient')
-        price = p.get('_price_str')
-        rrp = p.get('_rrp_str')
         brand_html = f'<span class="pcbl">{e(brand_lbl)}</span>' if brand_lbl else ''
-        if price:
-            ref_html = f'<span class="pcref">{ref}</span>' if ref else ''
-            price_lbl = 'WSP ' if p.get('_wsp') else ''
-            meta = f'<div class="pcmeta">{ref_html}<span class="pcprc">{price_lbl}{e(price)}</span></div>'
-            if rrp:
-                meta += f'<div class="pcrrp">RRP: {e(rrp)}</div>'
-        else:
-            meta = f'<div class="pcref">{ref}</div>' if ref else ''
+        meta = f'<div class="pcref">{ref}</div>' if ref else ''
         if in_stock:
             indicator = '<span class="avdot av"></span>'
             oos_cls = ''
@@ -594,12 +571,8 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'NA',sans-serif;bac
 .pcref{font-size:10.5px;color:var(--g400);letter-spacing:.02em;}
 .pcbl{position:absolute;top:7px;left:7px;max-width:calc(100% - 32px);background:rgba(255,255,255,.92);border:0.5px solid var(--g200);color:var(--g600);font-size:7px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:10px;z-index:2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .pcai{font-size:9.5px;font-weight:500;color:var(--blue);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-.pcmeta{display:flex;align-items:baseline;gap:8px;}
-.pcprc{margin-left:auto;font-size:10.5px;font-weight:700;color:var(--tx);white-space:nowrap;}
 .pc.oos .pcbl{opacity:.7;}
 .pc.oos .pcai{color:var(--g600);}
-.pcrrp{font-size:9.5px;font-weight:600;color:#e67e22;text-align:right;white-space:nowrap;}
-.pc.oos .pcprc{color:var(--g400);}
 .pppage{padding:5px 20px;display:flex;justify-content:space-between;align-items:center;font-size:9px;color:var(--g400);flex-shrink:0;}
 .pplegend{display:flex;align-items:center;gap:5px;font-size:8.5px;color:var(--g600);}
 /* CLOSING */
@@ -888,16 +861,12 @@ def build_html(pages, page_info, co, updated_at):
 
 # ── MAIN ─────────────────────────────────────────────────────────────────────
 
-def build_category_blocks(brand_products, ingredients, slug=None, currency=''):
+def build_category_blocks(brand_products, ingredients, slug=None):
     """Regroup brand-keyed products into category sections.
 
     Returns a list of blocks in page order; the Dental block follows Medical
     Devices. Each block: {'label','kicker','products'}.
-
-    UAE only: the list price is labelled WSP and the recommended retail price
-    (x_rrp) is rendered on a second line when it is set.
     """
-    is_uae = slug == 'uae'
     sections = {title: [] for title, _ in CATEGORY_SECTIONS}
     dental, unmapped = [], []
 
@@ -905,14 +874,6 @@ def build_category_blocks(brand_products, ingredients, slug=None, currency=''):
         for p in prods:
             ref = (p.get('default_code') or '').upper()
             p['_brand_label'] = p.get('_brand') or ''
-            if is_uae:
-                p['_wsp'] = True
-                try:
-                    _rrp = float(p.get('x_rrp') or 0)
-                except (TypeError, ValueError):
-                    _rrp = 0.0
-                if _rrp > 0:
-                    p['_rrp_str'] = format_price(_rrp, currency)
             if ref in DENTAL_SKUS:
                 dental.append(p); continue
             title = section_for(p)
@@ -1018,13 +979,8 @@ def generate_company(odoo, slug, dear_doctor):
 
     by_category = slug in CATEGORY_LAYOUT_SLUGS
     all_fetch_ids = tmpl_ids | cross_tmpl_ids | forced_tmpl_ids
-    # UAE also carries a recommended retail price alongside the wholesale list price
-    _extra_fields = None
-    if by_category:
-        _extra_fields = ['list_price'] + (['x_rrp'] if slug == 'uae' else [])
     products = get_product_templates(odoo, all_fetch_ids,
-                                     company_id=co['id'] if by_category else None,
-                                     extra_fields=_extra_fields)
+                                     company_id=co['id'] if by_category else None)
     all_tag_ids = set()
     for p in products: all_tag_ids.update(p.get('product_tag_ids',[]))
     brand_map = get_brand_tags(odoo, all_tag_ids)
@@ -1052,10 +1008,6 @@ def generate_company(odoo, slug, dear_doctor):
         if _uae_or:
             p['_in_stock'] = False
             p['_force_on_request'] = True
-        if by_category:
-            _lp = p.get('list_price')
-            p['_price_str'] = (None if _uae_or
-                               else format_price(_lp, co.get('currency','')))
         # Hide OOS products with specific SKU prefixes
         _oos_pfxs = HIDE_WHEN_OOS_PREFIXES.get(slug, [])
         if _oos_pfxs and not p.get('_in_stock') and not p.get('_force_on_request') and not p.get('_cross_company_or', False):
@@ -1121,11 +1073,8 @@ def generate_company(odoo, slug, dear_doctor):
 
     if by_category:
         blocks = build_category_blocks(brand_products, load_active_ingredients(),
-                                       slug=slug, currency=co.get('currency',''))
-        priced = sum(1 for b in blocks for p in b['products'] if p.get('_price_str'))
-        total_prods = sum(len(b['products']) for b in blocks)
+                                       slug=slug)
         print('  Sections: ' + ', '.join(f'{b["label"]} ({len(b["products"])})' for b in blocks))
-        print(f'  List price shown on {priced}/{total_prods} products')
         toc_intro = ('Click any category to jump to its section. Products are grouped by '
                      'category and sorted by brand within each section. Tap the section name '
                      'in the nav bar at any time to open the quick-jump menu.')
